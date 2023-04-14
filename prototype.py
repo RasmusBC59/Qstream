@@ -1,16 +1,9 @@
-import pytest
-import numpy as np
-import time
-import qcodes as qc
 import os
 import tempfile
 from qstream.example_instruments import FilterInstrument
-from panel.io.server import StoppableThread
 from qstream.livestream import LiveStream
 from qcodes import initialise_or_create_database_at, load_or_create_experiment
 from qstream.videoinstrument import VideoInstrument
-from qcodes.utils.dataset.doNd import do0d
-from qcodes.dataset.data_set import load_by_id
 
 tmp_path = tempfile.gettempdir()
 source_db_path = os.path.join(tmp_path, "source.db")
