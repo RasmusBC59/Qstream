@@ -1,3 +1,4 @@
+# %%
 import os
 import tempfile
 from qstream.example_instruments import FilterInstrument
@@ -16,10 +17,22 @@ video = VideoInstrument(
     n_points=(40, 2208),
 )
 
+video.x.V_dc(0.2)
+video.x.V_start(-0.5)
+video.x.V_stop(0.5)
+video.x.V_axis.reset()
+
+video.y.V_dc(-0.2)
+video.y.V_start(-0.5)
+video.y.V_stop(0.5)
+video.y.V_axis.reset()
 
 controllers = {
     "phase_x": (test_instrument.phase_x, 0.1, 0),
     "phase_y": (test_instrument.phase_y, 0.1, 0),
 }
 
-live = LiveStream(video=video, controllers=controllers, port=0, refresh_period=500)
+# %%
+live = LiveStream(video=video, controllers=controllers, port=0, refresh_period=100)
+
+# %%
