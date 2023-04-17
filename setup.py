@@ -9,8 +9,8 @@ import versioneer
 
 readme_file_path = Path(__file__).absolute().parent / "README.md"
 
-required_packages = ['opencensus-ext-azure']
-package_data = {"qstream": ["conf/telemetry.ini"] }
+required_packages = []
+package_data = {"qstream": [] }
 
 
 setup(
