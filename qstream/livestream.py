@@ -66,7 +66,7 @@ class LiveStream:
         )
         self.image_dmap = hv.DynamicMap(hv.Image, streams=[self.pipe])
         self.image_dmap.opts(
-            cmap="Magma", colorbar=True, width=400, height=350, toolbar="above"
+            cmap="Magma", colorbar=True, width=800, height=700, toolbar="above"
         )
 
         self.plotsettings = PlotSettings()
@@ -163,7 +163,7 @@ class LiveStream:
             self.data_grabber, self.refresh_period
         )
 
-        self.gridspec = GridSpec(width=800, height=600)
+        self.gridspec = GridSpec(width=1600, height=1200)
         self.gridspec[:, 0] = buttons
         self.gridspec[:, 1:3] = Column(
             self.image_dmap,

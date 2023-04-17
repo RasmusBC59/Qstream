@@ -9,7 +9,7 @@ import versioneer
 
 readme_file_path = Path(__file__).absolute().parent / "README.md"
 
-required_packages = []
+required_packages = ['qcodes', 'numpy', 'panel', 'holoviews', 'tornado']
 package_data = {"qstream": [] }
 
 
