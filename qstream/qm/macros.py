@@ -14,8 +14,9 @@ def round_to_fixed(x, number_of_bits=12):
     return round((2**number_of_bits) * x) / (2**number_of_bits)
 
 
-def measurement_macro_with_pulses(x_element, y_element, measured_element, wait_before_meas, I, I_stream, Q, Q_stream):
-
+def measurement_macro_with_pulses(
+    x_element, y_element, measured_element, wait_before_meas, I, I_stream, Q, Q_stream
+):
     # jump downwards diagonally to initialise the spin state
     play("jump" * amp(+0.05), x_element, duration=100)
     play("jump" * amp(-0.05), y_element, duration=100)
@@ -33,7 +34,9 @@ def measurement_macro_with_pulses(x_element, y_element, measured_element, wait_b
     # wait for 1us before measuring
     # wait(wait_before_meas // 4, measured_element)
 
-    measure("measure", measured_element, None, demod.full("cos", I), demod.full("sin", Q))
+    measure(
+        "measure", measured_element, None, demod.full("cos", I), demod.full("sin", Q)
+    )
     save(I, I_stream)
     save(Q, Q_stream)
 
@@ -51,7 +54,6 @@ def measurement_macro(measured_element, I, I_stream, Q, Q_stream):
 
 
 def spiral_order(N: int):
-
     # casting to int if necessary
     if not isinstance(N, int):
         N = int(N)
@@ -80,7 +82,9 @@ def spiral_order(N: int):
             total_moves = total_moves + 1
             order[i, j] = total_moves
         sign = sign * -1  # the next moves will be in the opposite direction
-        number_of_moves = number_of_moves + 1  # the next edges will require one more step
+        number_of_moves = (
+            number_of_moves + 1
+        )  # the next edges will require one more step
 
     # filling the final x edge, which cannot cleanly be done in the above while loop
     for _ in range(number_of_moves - 1):
