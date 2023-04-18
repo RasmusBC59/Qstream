@@ -163,7 +163,7 @@ class LiveStream:
             self.data_grabber, self.refresh_period
         )
 
-        self.gridspec = GridSpec(width=1600, height=1200)
+        self.gridspec = GridSpec(width=1600, height=1200, sizing_mode='scale_height')
         self.gridspec[:, 0] = buttons
         self.gridspec[:, 1:3] = Column(
             self.image_dmap,
