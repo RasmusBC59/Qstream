@@ -128,7 +128,6 @@ class LiveStream:
         )
 
         self.live_checkbox = Checkbox(name="live_stream")
-        self.auto_colobar_scale = Checkbox(name="auto_colobar_scale")
 
         self.control_widgets = []
         self.control_setget = []
@@ -167,7 +166,7 @@ class LiveStream:
         self.gridspec[:, 0] = buttons
         self.gridspec[:, 1:3] = Column(
             self.image_dmap,
-            Column(self.live_checkbox, self.auto_colobar_scale),
+            self.live_checkbox,
             self.average,
             self.set_average,
             self.max_average_text,
@@ -195,7 +194,6 @@ class LiveStream:
         if self.live_checkbox.value:
             try:
                 start_time = perf_counter()
-                self.auto_set_collorbar()
                 self.data = self.data_func.get()
                 self.nr_average_wiget.value = str(
                     self.data_func.root_instrument.nr_average.get()
@@ -245,10 +243,6 @@ class LiveStream:
         self.colorbar_button.loading = True
         self.set_colobar_scale()
         self.colorbar_button.loading = False
-
-    def auto_set_collorbar(self):
-        if self.auto_colobar_scale.value:
-            self.set_colobar_scale()
 
     def set_colobar_scale(self):
         cmin = self.data.min()
