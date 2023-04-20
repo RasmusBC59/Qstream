@@ -43,7 +43,7 @@ class LiveStream:
         dc_controllers: Optional[Tuple] = None,
         port=0,
         refresh_period=100,
-        awg=None,
+        start_stop=None,
     ):
         self.video = video
         self.controllers = controllers
@@ -84,7 +84,6 @@ class LiveStream:
         self.set_labels()
 
         self.moresttings = MoreSettings()
-
 
         self.measure_button = Button(
             name="Save", button_type="primary", width=self.button_width
@@ -128,6 +127,7 @@ class LiveStream:
         )
 
         self.live_checkbox = Checkbox(name="live_stream")
+        self.start_stop = start_stop
 
         self.control_widgets = []
         self.control_setget = []
@@ -162,15 +162,18 @@ class LiveStream:
             self.data_grabber, self.refresh_period
         )
 
-        self.gridspec = GridSpec(width=1600, height=1200, sizing_mode='scale_height')
+        self.gridspec = GridSpec(width=1600, height=1200, sizing_mode="scale_height")
         self.gridspec[:, 0] = buttons
-        self.gridspec[:, 1:3] = Column(
+        run_column = Column(
             self.image_dmap,
             self.live_checkbox,
             self.average,
             self.set_average,
             self.max_average_text,
         )
+        if self.start_stop:
+             run_column.append(self.start_stop.run_button)
+        self.gridspec[:, 1:3] = run_column
         self.gridspec[:, 3] = controllersset + controllersget
         self.dis_tabs = [
             ("Video", self.gridspec),
@@ -368,3 +371,4 @@ class dcWidget(ControleWidget):
         self.axis.V_dc.set(self.qchan.get())
         self.axis.V_axis.reset()
         self.rest_average(event)
+
