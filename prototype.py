@@ -55,3 +55,13 @@ live = LiveStream(video=video, controllers=controllers, port=0, refresh_period=1
 # %%
 live = LiveStream(video=video, controllers=controllers, port=0, refresh_period=100)
 # %%
+import numpy as np 
+A = np.array([[6, 1, 1],
+              [4, -2, 5],
+              [2, 8, 7]])
+# %%
+B = np.linalg.inv(A)
+# %%
+print(B)
+# %%
+B.dot([1,0,0])
