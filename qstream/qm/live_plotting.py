@@ -31,7 +31,6 @@ from qm.qua import (
     IO1,
     infinite_loop_,
 )
-import numpy as np
 from macros import round_to_fixed, spiral_order
 from time import sleep
 
@@ -45,8 +44,8 @@ class Live_plotting_spiral_modifiable:
 
     def __init__(
         self,
-        gate1,
-        gate1_range,
+        gate1: tuple,
+        gate1_range: dict,
         gate2,
         gate2_range,
         resolution,
@@ -54,7 +53,7 @@ class Live_plotting_spiral_modifiable:
         readout_pulse,
         config,
         measured_element="bottom_left_DQD_readout",
-        dividers={"gate_41": 7.9 * 1e-3, "gate_46": 8.1 * 1e-3},
+        dividers: dict ={"gate_41": 7.9 * 1e-3, "gate_46": 8.1 * 1e-3},
     ):
         self.qm = qm
         self.readout_pulse_length = (
@@ -84,7 +83,7 @@ class Live_plotting_spiral_modifiable:
         self.update = True
 
     def set_resolution(self, value):
-        assert value % 2 == 1, "the resolution must be odd {}".format(value)
+        assert value % 2 == 1, f"the resolution must be odd {value}"
         self.resolution = int(value)
         self.update = True
 
