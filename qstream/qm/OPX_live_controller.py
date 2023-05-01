@@ -120,6 +120,10 @@ class OPX_live_controller:
         self.measured_element = measured_element
         self.elements = elements
         self.virtual_ranges = virtual_ranges
+        self._virtual_ranges_converted = [0,0]
+
+        self.set_virtual1_range(virtual_ranges[0])
+        self.set_virtual2_range(virtual_ranges[1])
 
         if virtualization_matrix is None:
             self.virtualization_matrix = np.eye(2, len(elements))
@@ -186,11 +190,13 @@ class OPX_live_controller:
         return virtual_getters
 
     def set_virtual1_range(self, value):
-        self.virtual_ranges[0] = value / self.jump_amp
+        self.virtual_ranges[0] = value 
+        self._virtual_ranges_converted[0] = value / self.jump_amp 
         self.update = True
 
     def set_virtual2_range(self, value):
-        self.virtual_ranges[1] = value / self.jump_amp
+        self.virtual_ranges[1] = value 
+        self._virtual_ranges_converted[1] = value / self.jump_amp
         self.update = True
 
     def set_resolution(self, value):
@@ -259,8 +265,8 @@ class OPX_live_controller:
 
             with infinite_loop_():
                 if self.run_test:
-                    assign(virtual_steps[0], self.virtual_ranges[0] * div_resolution)
-                    assign(virtual_steps[1], self.virtual_ranges[1] * div_resolution)
+                    assign(virtual_steps[0], self._virtual_ranges_converted[0]*div_resolution)
+                    assign(virtual_steps[1], self._virtual_ranges_converted[1]*div_resolution)
                     # print('ranges*div',self.virtual_ranges[0]*div_resolution, self.virtual_ranges[1]*div_resolution)
 
                     for k in range(2):
@@ -401,7 +407,7 @@ class OPX_live_controller:
     def send_input_streams(
         self,
     ):
-        self.running_job.insert_input_stream("ranges_input_stream", self.virtual_ranges)
+        self.running_job.insert_input_stream("ranges_input_stream", self._virtual_ranges_converted)
         self.running_job.insert_input_stream("update_input_stream", [True])
         self.running_job.insert_input_stream(
             "virtualization_input_stream",
