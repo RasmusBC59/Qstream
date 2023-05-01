@@ -97,7 +97,7 @@ class OPX_live_controller:
         ), f"Each element must have an associated divider, {len(elements)} elements were given with {len(dividers)}"
         assert elements == list(
             dividers.keys()
-        ), f"elements and dividers must be given in same order, could be fixed later."
+        ), "elements and dividers must be given in same order, could be fixed later."
 
         self.qm = qm
 
