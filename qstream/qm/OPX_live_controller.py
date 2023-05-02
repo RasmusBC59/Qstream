@@ -1,4 +1,6 @@
 from functools import partial
+from typing import Callable, Any
+import numpy.typing as npt
 from qualang_tools.results import fetching_tool
 from qm.qua import (
     program,
@@ -29,7 +31,7 @@ import numpy as np
 from time import sleep
 
 
-def spiral_order(N: int):
+def spiral_order(N: int) -> npt.NDArray[np.int_]:
     # casting to int if necessary
     if not isinstance(N, int):
         N = int(N)
@@ -78,19 +80,19 @@ class OPX_live_controller:
 
     def __init__(
         self,
-        elements,
-        virtual_ranges,
-        resolution,
+        elements: tuple[str, ...],
+        virtual_ranges: tuple[float, ...],
+        resolution: int,
         qm,
-        readout_pulse,
-        config,
+        readout_pulse: str,
+        config: Any,
         virtualization_matrix=None,
-        wait_time=0,
-        jump_pulse="CW",
-        measured_element="bottom_left_DQD_readout",
-        dividers={"gate_41": 7.9, "gate_46": 8.1},
-        perform_measurement=True,
-        run_test=False,
+        wait_time: float = 0,
+        jump_pulse: str = "CW",
+        measured_element: str = "bottom_left_DQD_readout",
+        dividers: dict[str, float] = {"gate_41": 7.9, "gate_46": 8.1},
+        perform_measurement: bool = True,
+        run_test: bool = False,
     ):
         assert len(dividers) == len(
             elements
@@ -119,8 +121,8 @@ class OPX_live_controller:
 
         self.measured_element = measured_element
         self.elements = elements
-        self.virtual_ranges = virtual_ranges
-        self._virtual_ranges_converted = [0,0]
+        self.virtual_ranges = list(virtual_ranges)
+        self._virtual_ranges_converted = [0, 0]
 
         self.set_virtual1_range(virtual_ranges[0])
         self.set_virtual2_range(virtual_ranges[1])
@@ -149,18 +151,18 @@ class OPX_live_controller:
         self.program = self.make_program()
 
         self.virtual_setters = self.make_virt_setters(
-            ["virtual1", "virtual2"], elements
+            ("virtual1", "virtual2"), elements
         )
         self.virtual_getters = self.make_virt_getters(
-            ["virtual1", "virtual2"], elements
+            ("virtual1", "virtual2"), elements
         )
 
-    def set_virt_element(self, value, virtual_index, element):
+    def set_virt_element(self, value: float, virtual_index: int, element: int) -> None:
         self.virtualization_matrix[virtual_index, element] = value
         self.apply_dividers()
         self.update = True
 
-    def get_virt_element(self, virtual_index, element):
+    def get_virt_element(self, virtual_index: int, element: int) -> float:
         return self.virtualization_matrix[virtual_index, element]
 
     def apply_dividers(
@@ -171,7 +173,9 @@ class OPX_live_controller:
             * np.array(list(self.dividers.values()))[np.newaxis, :]
         )
 
-    def make_virt_setters(self, virtual_gates, elements):
+    def make_virt_setters(
+        self, virtual_gates: tuple[str, ...], elements: tuple[str, ...]
+    ) -> dict[str, partial[None]]:
         virtual_setters = {}
         for i, virt in enumerate(virtual_gates):
             for j, element in enumerate(elements):
@@ -180,7 +184,9 @@ class OPX_live_controller:
                 )  # lambda x: self.set_virt_element(
         return virtual_setters
 
-    def make_virt_getters(self, virtual_gates, elements):
+    def make_virt_getters(
+        self, virtual_gates: tuple[str, ...], elements: tuple[str, ...]
+    ) -> dict[str, partial[float]]:
         virtual_getters = {}
         for i, virt in enumerate(virtual_gates):
             for j, element in enumerate(elements):
@@ -189,17 +195,17 @@ class OPX_live_controller:
                 )  # lambda x: self.set_virt_element(
         return virtual_getters
 
-    def set_virtual1_range(self, value):
-        self.virtual_ranges[0] = value 
-        self._virtual_ranges_converted[0] = value / self.jump_amp 
+    def set_virtual1_range(self, value: float) -> None:
+        self.virtual_ranges[0] = value
+        self._virtual_ranges_converted[0] = value / self.jump_amp
         self.update = True
 
-    def set_virtual2_range(self, value):
-        self.virtual_ranges[1] = value 
+    def set_virtual2_range(self, value: float) -> None:
+        self.virtual_ranges[1] = value
         self._virtual_ranges_converted[1] = value / self.jump_amp
         self.update = True
 
-    def set_resolution(self, value):
+    def set_resolution(self, value: float) -> None:
         assert value % 2 == 1, "the resolution must be odd {}".format(value)
         self.resolution = int(value)
         self.update = True
@@ -265,8 +271,14 @@ class OPX_live_controller:
 
             with infinite_loop_():
                 if self.run_test:
-                    assign(virtual_steps[0], self._virtual_ranges_converted[0]*div_resolution)
-                    assign(virtual_steps[1], self._virtual_ranges_converted[1]*div_resolution)
+                    assign(
+                        virtual_steps[0],
+                        self._virtual_ranges_converted[0] * div_resolution,
+                    )
+                    assign(
+                        virtual_steps[1],
+                        self._virtual_ranges_converted[1] * div_resolution,
+                    )
                     # print('ranges*div',self.virtual_ranges[0]*div_resolution, self.virtual_ranges[1]*div_resolution)
 
                     for k in range(2):
@@ -407,7 +419,9 @@ class OPX_live_controller:
     def send_input_streams(
         self,
     ):
-        self.running_job.insert_input_stream("ranges_input_stream", self._virtual_ranges_converted)
+        self.running_job.insert_input_stream(
+            "ranges_input_stream", self._virtual_ranges_converted
+        )
         self.running_job.insert_input_stream("update_input_stream", [True])
         self.running_job.insert_input_stream(
             "virtualization_input_stream",
