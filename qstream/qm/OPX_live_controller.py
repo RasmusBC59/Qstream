@@ -25,6 +25,7 @@ from qm.qua import (
     while_,
     assign,
     infinite_loop_,
+    FUNCTIONS,
 )
 
 import numpy as np
@@ -80,17 +81,18 @@ class OPX_live_controller:
 
     def __init__(
         self,
-        elements: tuple[str, ...],
-        virtual_ranges: tuple[float, ...],
+        elements,#: tuple[str, ...],
+        virtual_ranges,#: tuple[float, ...],
         resolution: int,
         qm,
         readout_pulse: str,
         config: Any,
+        n_averages: int = 20,
         virtualization_matrix=None,
         wait_time: float = 0,
         jump_pulse: str = "CW",
         measured_element: str = "bottom_left_DQD_readout",
-        dividers: dict[str, float] = {"gate_41": 7.9, "gate_46": 8.1},
+        dividers={"gate_41": 7.9, "gate_46": 8.1}, #: dict[str, float] = {"gate_41": 7.9, "gate_46": 8.1},
         perform_measurement: bool = True,
         run_test: bool = False,
     ):
@@ -118,11 +120,13 @@ class OPX_live_controller:
         self.jump_pulse = jump_pulse
         CW_pulse = config["pulses"][jump_pulse]["waveforms"]["single"]
         self.jump_amp = config["waveforms"][CW_pulse]["sample"]
+        
 
         self.measured_element = measured_element
         self.elements = elements
         self.virtual_ranges = list(virtual_ranges)
         self._virtual_ranges_converted = [0, 0]
+        
 
         self.set_virtual1_range(virtual_ranges[0])
         self.set_virtual2_range(virtual_ranges[1])
@@ -144,6 +148,7 @@ class OPX_live_controller:
         self.set_virtual1_range(virtual_ranges[0])
         self.set_virtual2_range(virtual_ranges[1])
 
+        self.n_averages = n_averages
         self.update = True
         self.perform_measurement = perform_measurement  # only for testing
         self.run_test = run_test  # only for testing
@@ -156,6 +161,7 @@ class OPX_live_controller:
         self.virtual_getters = self.make_virt_getters(
             ("virtual1", "virtual2"), elements
         )
+
 
     def set_virt_element(self, value: float, virtual_index: int, element: int) -> None:
         self.virtualization_matrix[virtual_index, element] = value
@@ -174,8 +180,10 @@ class OPX_live_controller:
         )
 
     def make_virt_setters(
-        self, virtual_gates: tuple[str, ...], elements: tuple[str, ...]
-    ) -> dict[str, partial[None]]:
+        self,
+        virtual_gates,#: tuple[str, ...],
+        elements,#: tuple[str, ...]
+    ): #-> dict[str, partial[None]]:
         virtual_setters = {}
         for i, virt in enumerate(virtual_gates):
             for j, element in enumerate(elements):
@@ -185,8 +193,10 @@ class OPX_live_controller:
         return virtual_setters
 
     def make_virt_getters(
-        self, virtual_gates: tuple[str, ...], elements: tuple[str, ...]
-    ) -> dict[str, partial[float]]:
+        self,
+        virtual_gates,#: tuple[str, ...],
+        elements,#: tuple[str, ...]
+    ): #-> dict[str, partial[None]]:
         virtual_getters = {}
         for i, virt in enumerate(virtual_gates):
             for j, element in enumerate(elements):
@@ -253,6 +263,7 @@ class OPX_live_controller:
 
             i = declare(int)  # an index variable for the x index
             j = declare(int)  # an index variable for the y index
+            average_index = declare(int)
 
             gate_vals = {gate: declare(fixed, value=0) for gate in self.elements}
             gate_vals_streams = {gate: declare_stream() for gate in self.elements}
@@ -315,99 +326,102 @@ class OPX_live_controller:
                                     * virtual_steps[k],
                                 )
 
-                # initialising variables
-                assign(moves_per_edge, 1)
-                assign(completed_moves, 0)
-                assign(movement_direction, +1)
+                with for_(average_index, 0, average_index<self.n_averages, average_index + 1):
+                    # initialising variables
+                    assign(moves_per_edge, 1)
+                    assign(completed_moves, 0)
+                    assign(movement_direction, +1)
 
-                # for the first pixel it is unnecessary to move before measuring
-                for gate in self.elements:
-                    assign(gate_vals[gate], 0)
-                    save(gate_vals[gate], gate_vals_streams[gate])
-
-                if self.perform_measurement:
-                    self.measurement_macro()
-
-                with while_(completed_moves < self.resolution * (self.resolution - 1)):
-                    # for_ loop to move the required number of moves in the x direction
-                    with for_(i, 0, i < moves_per_edge, i + 1):
-                        for gate, step_size in zip(
-                            self.elements, step_size_matrix[0, :]
-                        ):
-                            play(
-                                self.jump_pulse * amp(movement_direction * step_size),
-                                gate,
-                                duration=self.readout_pulse_length,
-                            )
-                            assign(
-                                gate_vals[gate],
-                                gate_vals[gate] + (movement_direction * step_size),
-                            )
-                            save(gate_vals[gate], gate_vals_streams[gate])
-
-                        if self.perform_measurement:
-                            self.measurement_macro()
-
-                    # for_ loop to move the required number of moves in the y direction
-                    with for_(j, 0, j < moves_per_edge, j + 1):
-                        for gate, step_size in zip(
-                            self.elements, step_size_matrix[1, :]
-                        ):
-                            play(
-                                self.jump_pulse * amp(movement_direction * step_size),
-                                gate,
-                                duration=self.readout_pulse_length,
-                            )
-                            assign(
-                                gate_vals[gate],
-                                gate_vals[gate] + (movement_direction * step_size),
-                            )
-                            save(gate_vals[gate], gate_vals_streams[gate])
-
-                        if self.perform_measurement:
-                            self.measurement_macro()
-
-                    # updating the variables
-                    assign(
-                        completed_moves, completed_moves + 2 * moves_per_edge
-                    )  # * 2 because moves in both x and y
-                    assign(
-                        movement_direction, movement_direction * -1
-                    )  # *-1 as subsequent steps in the opposite direction
-                    assign(
-                        moves_per_edge, moves_per_edge + 1
-                    )  # moving one row/column out so need one more move_per_edge
-
-                # filling in the final x row, which was not covered by the previous for_ loop
-                with for_(i, 0, i < moves_per_edge - 1, i + 1):
-                    for gate, step_size in zip(self.elements, step_size_matrix[0, :]):
-                        play(
-                            "CW" * amp(movement_direction * step_size),
-                            gate,
-                            duration=self.readout_pulse_length,
-                        )
-                        assign(
-                            gate_vals[gate],
-                            gate_vals[gate] + (movement_direction * step_size),
-                        )
+                    # for the first pixel it is unnecessary to move before measuring
+                    for gate in self.elements:
+                        assign(gate_vals[gate], 0)
                         save(gate_vals[gate], gate_vals_streams[gate])
 
-                    # Make sure that we measure after the pulse has settled
                     if self.perform_measurement:
                         self.measurement_macro()
 
-                # aligning and ramping to zero to return to initial state
-                for gate in self.elements:
-                    ramp_to_zero(gate, duration=ramp_to_zero_duration)
+                    with while_(completed_moves < self.resolution * (self.resolution - 1)):
+                        # for_ loop to move the required number of moves in the x direction
+                        with for_(i, 0, i < moves_per_edge, i + 1):
+                            for gate, step_size in zip(
+                                self.elements, step_size_matrix[0, :]
+                            ):
+                                play(
+                                    self.jump_pulse * amp(movement_direction * step_size),
+                                    gate,
+                                    duration=self.readout_pulse_length,
+                                )
+                                assign(
+                                    gate_vals[gate],
+                                    gate_vals[gate] + (movement_direction * step_size),
+                                )
+                                save(gate_vals[gate], gate_vals_streams[gate])
 
-                wait(1000)
+                            if self.perform_measurement:
+                                self.measurement_macro()
+
+                        # for_ loop to move the required number of moves in the y direction
+                        with for_(j, 0, j < moves_per_edge, j + 1):
+                            for gate, step_size in zip(
+                                self.elements, step_size_matrix[1, :]
+                            ):
+                                play(
+                                    self.jump_pulse * amp(movement_direction * step_size),
+                                    gate,
+                                    duration=self.readout_pulse_length,
+                                )
+                                assign(
+                                    gate_vals[gate],
+                                    gate_vals[gate] + (movement_direction * step_size),
+                                )
+                                save(gate_vals[gate], gate_vals_streams[gate])
+
+                            if self.perform_measurement:
+                                self.measurement_macro()
+
+                        # updating the variables
+                        assign(
+                            completed_moves, completed_moves + 2 * moves_per_edge
+                        )  # * 2 because moves in both x and y
+                        assign(
+                            movement_direction, movement_direction * -1
+                        )  # *-1 as subsequent steps in the opposite direction
+                        assign(
+                            moves_per_edge, moves_per_edge + 1
+                        )  # moving one row/column out so need one more move_per_edge
+
+                    # filling in the final x row, which was not covered by the previous for_ loop
+                    with for_(i, 0, i < moves_per_edge - 1, i + 1):
+                        for gate, step_size in zip(self.elements, step_size_matrix[0, :]):
+                            play(
+                                "CW" * amp(movement_direction * step_size),
+                                gate,
+                                duration=self.readout_pulse_length,
+                            )
+                            assign(
+                                gate_vals[gate],
+                                gate_vals[gate] + (movement_direction * step_size),
+                            )
+                            save(gate_vals[gate], gate_vals_streams[gate])
+
+                        # Make sure that we measure after the pulse has settled
+                        if self.perform_measurement:
+                            self.measurement_macro()
+
+                    # aligning and ramping to zero to return to initial state
+                    for gate in self.elements:
+                        ramp_to_zero(gate, duration=ramp_to_zero_duration)
+
+                    wait(1000) # this wait is not needed
 
             with stream_processing():
                 if self.perform_measurement:
                     for stream_name, stream in zip(
                         ["I", "Q"], [self._I_stream, self._Q_stream]
                     ):
-                        stream.buffer(self.resolution**2).save(
+                        stream.buffer(
+                            self.n_averages,self.resolution**2
+                                      ).map(FUNCTIONS.average(0)).save(
                             stream_name
                         )  # .buffer(resolution**2)
 
