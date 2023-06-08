@@ -245,6 +245,10 @@ class OPX_live_controller:
         ramp_to_zero_duration = 1
         div_resolution = 1 / (self.resolution - 1)
         # print(div_resolution)
+        if self.n_averages==0:
+            repeats = 1
+        else:
+            repeats = self.n_averages
 
         with program() as spiral_scan:
             # resolution_input_stream = declare_input_stream(int, name='resolution_input_stream')
@@ -303,6 +307,7 @@ class OPX_live_controller:
                 else:
                     advance_input_stream(update_input_stream)
                     with if_(update_input_stream):
+                        # self._I_stream, self._Q_stream = declare_stream(), declare_stream()
                         # advance_input_stream(resolution_input_stream)
                         advance_input_stream(ranges_input_stream)
                         advance_input_stream(virtualization_input_stream)
@@ -326,7 +331,7 @@ class OPX_live_controller:
                                     * virtual_steps[k],
                                 )
 
-                with for_(average_index, 0, average_index<self.n_averages, average_index + 1):
+                with for_(average_index, 0, average_index<repeats, average_index + 1):
                     # initialising variables
                     assign(moves_per_edge, 1)
                     assign(completed_moves, 0)
@@ -419,11 +424,18 @@ class OPX_live_controller:
                     for stream_name, stream in zip(
                         ["I", "Q"], [self._I_stream, self._Q_stream]
                     ):
-                        stream.buffer(
-                            self.n_averages,self.resolution**2
-                                      ).map(FUNCTIONS.average(0)).save(
-                            stream_name
-                        )  # .buffer(resolution**2)
+                        if self.n_averages==0:
+                            stream.buffer(self.resolution**2
+                                        ).save( 
+                                stream_name
+                            )
+                        else:
+                            stream.buffer(self.resolution**2
+                                        ).buffer(self.n_averages
+                                        ).map(FUNCTIONS.average(0)).save( 
+                                stream_name
+                            )
+                        
 
                 for gate, stream in gate_vals_streams.items():
                     stream.buffer(self.resolution**2).save_all(gate)
