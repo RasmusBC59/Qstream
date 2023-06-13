@@ -26,6 +26,7 @@ from qm.qua import (
     assign,
     infinite_loop_,
     FUNCTIONS,
+    pause,
 )
 
 import numpy as np
@@ -81,8 +82,8 @@ class OPX_live_controller:
 
     def __init__(
         self,
-        elements,#: tuple[str, ...],
-        virtual_ranges,#: tuple[float, ...],
+        elements,  #: tuple[str, ...],
+        virtual_ranges,  #: tuple[float, ...],
         resolution: int,
         qm,
         readout_pulse: str,
@@ -92,7 +93,10 @@ class OPX_live_controller:
         wait_time: float = 0,
         jump_pulse: str = "CW",
         measured_element: str = "bottom_left_DQD_readout",
-        dividers={"gate_41": 7.9, "gate_46": 8.1}, #: dict[str, float] = {"gate_41": 7.9, "gate_46": 8.1},
+        dividers={
+            "gate_41": 7.9,
+            "gate_46": 8.1,
+        },  #: dict[str, float] = {"gate_41": 7.9, "gate_46": 8.1},
         perform_measurement: bool = True,
         run_test: bool = False,
     ):
@@ -104,7 +108,6 @@ class OPX_live_controller:
         ), "elements and dividers must be given in same order, could be fixed later."
 
         self.qm = qm
-
         if (np.array(virtual_ranges) > 0.5).any():
             raise Exception(
                 f"Virtual ranges must be given in units of Volt, values above 0.5 will raise this error, values given were:{virtual_ranges}"
@@ -120,13 +123,11 @@ class OPX_live_controller:
         self.jump_pulse = jump_pulse
         CW_pulse = config["pulses"][jump_pulse]["waveforms"]["single"]
         self.jump_amp = config["waveforms"][CW_pulse]["sample"]
-        
 
         self.measured_element = measured_element
         self.elements = elements
         self.virtual_ranges = list(virtual_ranges)
         self._virtual_ranges_converted = [0, 0]
-        
 
         self.set_virtual1_range(virtual_ranges[0])
         self.set_virtual2_range(virtual_ranges[1])
@@ -162,7 +163,6 @@ class OPX_live_controller:
             ("virtual1", "virtual2"), elements
         )
 
-
     def set_virt_element(self, value: float, virtual_index: int, element: int) -> None:
         self.virtualization_matrix[virtual_index, element] = value
         self.apply_dividers()
@@ -181,9 +181,9 @@ class OPX_live_controller:
 
     def make_virt_setters(
         self,
-        virtual_gates,#: tuple[str, ...],
-        elements,#: tuple[str, ...]
-    ): #-> dict[str, partial[None]]:
+        virtual_gates,  #: tuple[str, ...],
+        elements,  #: tuple[str, ...]
+    ):  # -> dict[str, partial[None]]:
         virtual_setters = {}
         for i, virt in enumerate(virtual_gates):
             for j, element in enumerate(elements):
@@ -194,9 +194,9 @@ class OPX_live_controller:
 
     def make_virt_getters(
         self,
-        virtual_gates,#: tuple[str, ...],
-        elements,#: tuple[str, ...]
-    ): #-> dict[str, partial[None]]:
+        virtual_gates,  #: tuple[str, ...],
+        elements,  #: tuple[str, ...]
+    ):  # -> dict[str, partial[None]]:
         virtual_getters = {}
         for i, virt in enumerate(virtual_gates):
             for j, element in enumerate(elements):
@@ -245,7 +245,7 @@ class OPX_live_controller:
         ramp_to_zero_duration = 1
         div_resolution = 1 / (self.resolution - 1)
         # print(div_resolution)
-        if self.n_averages==0:
+        if self.n_averages == 0:
             repeats = 1
         else:
             repeats = self.n_averages
@@ -331,7 +331,7 @@ class OPX_live_controller:
                                     * virtual_steps[k],
                                 )
 
-                with for_(average_index, 0, average_index<repeats, average_index + 1):
+                with for_(average_index, 0, average_index < repeats, average_index + 1):
                     # initialising variables
                     assign(moves_per_edge, 1)
                     assign(completed_moves, 0)
@@ -345,14 +345,17 @@ class OPX_live_controller:
                     if self.perform_measurement:
                         self.measurement_macro()
 
-                    with while_(completed_moves < self.resolution * (self.resolution - 1)):
+                    with while_(
+                        completed_moves < self.resolution * (self.resolution - 1)
+                    ):
                         # for_ loop to move the required number of moves in the x direction
                         with for_(i, 0, i < moves_per_edge, i + 1):
                             for gate, step_size in zip(
                                 self.elements, step_size_matrix[0, :]
                             ):
                                 play(
-                                    self.jump_pulse * amp(movement_direction * step_size),
+                                    self.jump_pulse
+                                    * amp(movement_direction * step_size),
                                     gate,
                                     duration=self.readout_pulse_length,
                                 )
@@ -371,7 +374,8 @@ class OPX_live_controller:
                                 self.elements, step_size_matrix[1, :]
                             ):
                                 play(
-                                    self.jump_pulse * amp(movement_direction * step_size),
+                                    self.jump_pulse
+                                    * amp(movement_direction * step_size),
                                     gate,
                                     duration=self.readout_pulse_length,
                                 )
@@ -397,7 +401,9 @@ class OPX_live_controller:
 
                     # filling in the final x row, which was not covered by the previous for_ loop
                     with for_(i, 0, i < moves_per_edge - 1, i + 1):
-                        for gate, step_size in zip(self.elements, step_size_matrix[0, :]):
+                        for gate, step_size in zip(
+                            self.elements, step_size_matrix[0, :]
+                        ):
                             play(
                                 "CW" * amp(movement_direction * step_size),
                                 gate,
@@ -417,28 +423,22 @@ class OPX_live_controller:
                     for gate in self.elements:
                         ramp_to_zero(gate, duration=ramp_to_zero_duration)
 
-                    wait(1000) # this wait is not needed
+                    wait(200)
+                pause()  # this wait is not needed
 
             with stream_processing():
                 if self.perform_measurement:
                     for stream_name, stream in zip(
                         ["I", "Q"], [self._I_stream, self._Q_stream]
                     ):
-                        if self.n_averages==0:
-                            stream.buffer(self.resolution**2
-                                        ).save( 
-                                stream_name
-                            )
+                        if self.n_averages == 0:
+                            stream.buffer(self.resolution**2).save(stream_name)
                         else:
-                            stream.buffer(self.resolution**2
-                                        ).buffer(self.n_averages
-                                        ).map(FUNCTIONS.average(0)).save( 
-                                stream_name
-                            )
-                        
-
-                for gate, stream in gate_vals_streams.items():
-                    stream.buffer(self.resolution**2).save_all(gate)
+                            stream.buffer(repeats, self.resolution**2).map(
+                                FUNCTIONS.average(0)
+                            ).save(stream_name)
+                # for gate, stream in gate_vals_streams.items():
+                #     stream.buffer(self.resolution**2).save_all(gate)
 
         return spiral_scan
 
@@ -483,6 +483,8 @@ class OPX_live_controller:
             raise Exception(
                 'data fetcher not started, run "start_measurement" before trying to fetch results'
             )
+        while not self.running_job.is_paused():
+            sleep(0.01)
 
         if self.update:
             self.send_input_streams()
@@ -491,6 +493,7 @@ class OPX_live_controller:
             self.running_job.insert_input_stream("update_input_stream", [False])
 
         I, Q = self.data_fetcher.fetch_all()
+        self.running_job.resume()
         amplitude = I**2 + Q**2
         self.order = spiral_order(self.resolution)
         return amplitude[self.order]
