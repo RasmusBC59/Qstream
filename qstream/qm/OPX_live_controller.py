@@ -118,6 +118,7 @@ class OPX_live_controller:
             config["pulses"][readout_pulse]["length"] // 4
         )  # length in clockcycles
         self.readout_pulse = readout_pulse
+        self.set_resolution(resolution)
 
         # get jump pulse and jump pulse amplitude, will be used to output correct voltages
         self.jump_pulse = jump_pulse
@@ -127,10 +128,10 @@ class OPX_live_controller:
         self.measured_element = measured_element
         self.elements = elements
         self.virtual_ranges = list(virtual_ranges)
-        self._virtual_ranges_converted = [0, 0]
+        self._virtual_ranges_converted = np.array([0.0, 0.0])
 
-        self.set_virtual1_range(virtual_ranges[0])
-        self.set_virtual2_range(virtual_ranges[1])
+        # self.set_virtual1_range(virtual_ranges[0])
+        # self.set_virtual2_range(virtual_ranges[1])
 
         if virtualization_matrix is None:
             self.virtualization_matrix = np.eye(2, len(elements))
@@ -145,7 +146,6 @@ class OPX_live_controller:
         self.apply_dividers()
         self.wait_time = wait_time
 
-        self.set_resolution(resolution)
         self.set_virtual1_range(virtual_ranges[0])
         self.set_virtual2_range(virtual_ranges[1])
 
@@ -153,6 +153,10 @@ class OPX_live_controller:
         self.update = True
         self.perform_measurement = perform_measurement  # only for testing
         self.run_test = run_test  # only for testing
+
+        # print("virt_matrix", self.virtualization_and_dividers_matrix)
+        # step_size_matrix = np.zeros(self.virtualization_and_dividers_matrix.shape)
+        self.update_outside_step_size_matrix()
 
         self.program = self.make_program()
 
@@ -166,6 +170,7 @@ class OPX_live_controller:
     def set_virt_element(self, value: float, virtual_index: int, element: int) -> None:
         self.virtualization_matrix[virtual_index, element] = value
         self.apply_dividers()
+        # self.update_outside_step_size_matrix()
         self.update = True
 
     def get_virt_element(self, virtual_index: int, element: int) -> float:
@@ -206,19 +211,36 @@ class OPX_live_controller:
         return virtual_getters
 
     def set_virtual1_range(self, value: float) -> None:
+        # print("virt1", value)
         self.virtual_ranges[0] = value
+        # print(self.virtual_ranges[0])
+        # print(self.jump_amp)
         self._virtual_ranges_converted[0] = value / self.jump_amp
+        # print("virt1", self._virtual_ranges_converted)
+        # self.update_outside_step_size_matrix()
         self.update = True
 
     def set_virtual2_range(self, value: float) -> None:
         self.virtual_ranges[1] = value
         self._virtual_ranges_converted[1] = value / self.jump_amp
+        # self.update_outside_step_size_matrix()
         self.update = True
 
     def set_resolution(self, value: float) -> None:
         assert value % 2 == 1, "the resolution must be odd {}".format(value)
         self.resolution = int(value)
         self.update = True
+
+    def update_outside_step_size_matrix(
+        self,
+    ):
+        step_sizes = self._virtual_ranges_converted / (self.resolution - 1)
+        # print("step sized", step_sizes)
+        self.outside_step_size_matrix = (
+            self.virtualization_and_dividers_matrix * np.array(step_sizes).T
+        )
+        self.update = True
+        # print("outside_step_matrix", self.outside_step_size_matrix)
 
     def measurement_macro(
         self,
@@ -252,15 +274,18 @@ class OPX_live_controller:
 
         with program() as spiral_scan:
             # resolution_input_stream = declare_input_stream(int, name='resolution_input_stream')
-            ranges_input_stream = declare_input_stream(
-                fixed, name="ranges_input_stream", size=2
-            )
+            # ranges_input_stream = declare_input_stream(
+            #     fixed, name="ranges_input_stream", size=2
+            # )
             update_input_stream = declare_input_stream(bool, name="update_input_stream")
-            virtualization_input_stream = declare_input_stream(
-                fixed, name="virtualization_input_stream", size=len(self.elements) * 2
+            # virtualization_input_stream = declare_input_stream(
+            #     fixed, name="virtualization_input_stream", size=len(self.elements) * 2
+            # )
+            step_size_matrix_input_stream = declare_input_stream(
+                fixed, name="step_size_matrix_input_stream", size=len(self.elements) * 2
             )
 
-            virtual_steps = [declare(fixed), declare(fixed)]
+            # virtual_steps = [declare(fixed), declare(fixed)]
             step_size_matrix = np.array(
                 [[declare(fixed) for i in range(len(self.elements))] for j in range(2)]
             )
@@ -272,6 +297,8 @@ class OPX_live_controller:
             gate_vals = {gate: declare(fixed, value=0) for gate in self.elements}
             gate_vals_streams = {gate: declare_stream() for gate in self.elements}
 
+            virtualization_stream = declare_stream()
+            step_size_stream = declare_stream()
             moves_per_edge = declare(
                 int
             )  # the number of moves per edge [1, resolution]
@@ -309,29 +336,49 @@ class OPX_live_controller:
                     with if_(update_input_stream):
                         # self._I_stream, self._Q_stream = declare_stream(), declare_stream()
                         # advance_input_stream(resolution_input_stream)
-                        advance_input_stream(ranges_input_stream)
-                        advance_input_stream(virtualization_input_stream)
+                        # advance_input_stream(ranges_input_stream)
+                        # advance_input_stream(virtualization_input_stream)
+                        advance_input_stream(step_size_matrix_input_stream)
 
                         # assign(resolution, resolution_input_stream)
                         # assign(div_resolution, Math.div(1, resolution-1))
-                        assign(
-                            virtual_steps[0], ranges_input_stream[0] * div_resolution
-                        )
-                        assign(
-                            virtual_steps[1], ranges_input_stream[1] * div_resolution
-                        )
+                        # assign(
+                        #     virtual_steps[0], ranges_input_stream[0] * div_resolution
+                        # )
+                        # assign(
+                        #     virtual_steps[1], ranges_input_stream[1] * div_resolution
+                        # )
 
                         for k in range(2):
                             for l in range(len(self.elements)):
                                 assign(
                                     step_size_matrix[k, l],
-                                    virtualization_input_stream[
+                                    step_size_matrix_input_stream[
                                         k * len(self.elements) + l
-                                    ]
-                                    * virtual_steps[k],
+                                    ],
                                 )
+                        # test saving
+                        # with for_(
+                        #     average_index,
+                        #     0,
+                        #     average_index
+                        #     < len(self.virtualization_and_dividers_matrix.flatten()),
+                        #     average_index + 1,
+                        # ):
+                        #     save(
+                        #         virtualization_input_stream[average_index],
+                        #         virtualization_stream,
+                        #     )
+                        for thing in step_size_matrix.flatten():
+                            save(thing, step_size_stream)
 
                 with for_(average_index, 0, average_index < repeats, average_index + 1):
+                    # print(
+                    #     self.elements,
+                    #     self.virtualization_and_dividers_matrix,
+                    #     self.virtual_ranges,
+                    #     div_resolution,
+                    # )
                     # initialising variables
                     assign(moves_per_edge, 1)
                     assign(completed_moves, 0)
@@ -423,8 +470,8 @@ class OPX_live_controller:
                     for gate in self.elements:
                         ramp_to_zero(gate, duration=ramp_to_zero_duration)
 
-                    wait(200)
-                pause()  # this wait is not needed
+                    wait(200)  # this wait is not needed
+                pause()
 
             with stream_processing():
                 if self.perform_measurement:
@@ -437,30 +484,43 @@ class OPX_live_controller:
                             stream.buffer(repeats, self.resolution**2).map(
                                 FUNCTIONS.average(0)
                             ).save(stream_name)
-                # for gate, stream in gate_vals_streams.items():
-                #     stream.buffer(self.resolution**2).save_all(gate)
+                for gate, stream in gate_vals_streams.items():
+                    stream.buffer(self.resolution**2).save_all(gate)
+
+                step_size_stream.buffer(*step_size_matrix.shape).save_all("step_size")
+                # virtualization_stream.buffer(*step_size_matrix.shape).save_all(
+                #     "virtualization"
+                # )
 
         return spiral_scan
 
     def send_input_streams(
         self,
     ):
-        self.running_job.insert_input_stream(
-            "ranges_input_stream", self._virtual_ranges_converted
-        )
+        # self.running_job.insert_input_stream(
+        #     "ranges_input_stream", self._virtual_ranges_converted
+        # )
         self.running_job.insert_input_stream("update_input_stream", [True])
+        # self.running_job.insert_input_stream(
+        #     "virtualization_input_stream",
+        #     self.virtualization_and_dividers_matrix.flatten().tolist(),
+        # )
+        self.update_outside_step_size_matrix()
+
         self.running_job.insert_input_stream(
-            "virtualization_input_stream",
-            self.virtualization_and_dividers_matrix.flatten().tolist(),
+            "step_size_matrix_input_stream",
+            self.outside_step_size_matrix.flatten().tolist(),
         )
-        # self.running_job.insert_input_stream('resolution_input_stream', self.resolution)
 
     def start_measurement(
         self,
     ):
         self.running_job = self.qm.execute(self.program)
         self.send_input_streams()
-        sleep(5)
+        # while not self.running_job.is_paused():
+        #     sleep(0.01)
+        # self.running_job.resume()
+        sleep(3)
         # if self.perform_measurement:
         self.data_fetcher = fetching_tool(
             self.running_job,
@@ -483,6 +543,7 @@ class OPX_live_controller:
             raise Exception(
                 'data fetcher not started, run "start_measurement" before trying to fetch results'
             )
+
         while not self.running_job.is_paused():
             sleep(0.01)
 
