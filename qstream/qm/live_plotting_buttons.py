@@ -35,9 +35,23 @@ class Stop_job:
         self.run_button = Button(name="Run", button_type="default")
         self.run_button.on_click(self.stop_job)
 
-    def stop_job(self,):
+    def stop_job(
+        self,
+    ):
         self.job.halt()
 
 
 class Start_stop_extra_step:
-    def __init__(self, ) -> None:
+    def __init__(self, start_stop_extra_step, reset_average) -> None:
+        self.start_stop_extra_step = start_stop_extra_step
+        self.reset_average = reset_average
+        self.button = Button(name="start/stop extra step", button_type="default")
+        self.button.on_click(self.run_event)
+
+    def run_event(self, event):
+        self.start_stop_extra_step()
+        self.reset_average(event)
+
+
+def start_stop_extra_step_wrapper(OPX_live_controller):
+    OPX_live_controller.perform_extra_step = not OPX_live_controller.perform_extra_step

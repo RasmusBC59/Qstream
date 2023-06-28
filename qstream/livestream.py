@@ -44,6 +44,7 @@ class LiveStream:
         port=0,
         refresh_period=100,
         start_stop=None,
+        extra_step=None,
     ):
         self.video = video
         self.controllers = controllers
@@ -128,6 +129,7 @@ class LiveStream:
 
         self.live_checkbox = Checkbox(name="live_stream")
         self.start_stop = start_stop
+        self.extra_step = extra_step
 
         self.control_widgets = []
         self.control_setget = []
@@ -172,7 +174,14 @@ class LiveStream:
             self.max_average_text,
         )
         if self.start_stop:
-             run_column.append(self.start_stop.run_button)
+            run_column.append(self.start_stop.run_button)
+
+        if self.extra_step:
+            self.extra_step_widget = Start_stop_extra_step(
+                start_stop_extra_step=self.extra_step, reset_average=self.reset_average
+            )
+            run_column.append(self.extra_step_widget.button)
+
         self.gridspec[:, 1:3] = run_column
         self.gridspec[:, 3] = controllersset + controllersget
         self.dis_tabs = [
@@ -372,3 +381,14 @@ class dcWidget(ControleWidget):
         self.axis.V_axis.reset()
         self.rest_average(event)
 
+
+class Start_stop_extra_step:
+    def __init__(self, start_stop_extra_step, reset_average) -> None:
+        self.start_stop_extra_step = start_stop_extra_step
+        self.reset_average = reset_average
+        self.button = Button(name="start/stop extra step", button_type="default")
+        self.button.on_click(self.run_event)
+
+    def run_event(self, event):
+        self.start_stop_extra_step()
+        self.reset_average(event)
