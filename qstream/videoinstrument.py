@@ -7,6 +7,9 @@ from qcodes.instrument.parameter import ParameterWithSetpoints, Parameter
 from typing import Any, Iterable, Tuple, Union
 from qstream.timeout import timeout
 
+global time_open_threat
+time_open_threat = 3
+
 
 class GeneratedSetPoints(Parameter):
     """
@@ -38,9 +41,8 @@ class Video(ParameterWithSetpoints):
         self.data_func = data_func
         self.nr_average = 1
 
-    @timeout(0.5)
+    @timeout(time_open_threat)
     def get_raw(self):
-
         return self.data_func()
 
     def reset_average(self):
@@ -55,7 +57,7 @@ class VideoAverage(ParameterWithSetpoints):
         self.data_func = self.root_instrument.video.get
         # self.data = self.data_func()
 
-    @timeout(0.5)
+    @timeout(time_open_threat)
     def get_raw(self):
         self.nr_average = self.root_instrument.nr_average.get()
         if self.nr_average == 1:
@@ -81,7 +83,7 @@ class VideoRunnigAverage(ParameterWithSetpoints):
         self.data_array = []
         # self.data = self.data_func()
 
-    @timeout(0.5)
+    @timeout(time_open_threat)
     def get_raw(self):
         self.nr_average = self.root_instrument.nr_average.get()
         if self.nr_average == 1:
@@ -109,7 +111,6 @@ class VideoRunnigAverage(ParameterWithSetpoints):
 
 class VideoInstrument(Instrument):
     def __init__(self, name, data_func, n_points, **kwargs):
-
         super().__init__(name, **kwargs)
         self.data_func = data_func
         self.dis_tabs = None
