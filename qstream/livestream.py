@@ -212,7 +212,7 @@ class LiveStream:
                 )
                 self.pipe.send(
                     (
-                        self.data_func.setpoints[1].get(),
+                        self.data_func.setpoints[1].get(), # so columns=x and rows=y
                         self.data_func.setpoints[0].get(),
                         self.data,
                     )
