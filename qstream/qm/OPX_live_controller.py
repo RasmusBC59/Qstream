@@ -86,7 +86,7 @@ class VirtualGateSetMeasurement:
         sweep_range: float = 0.05,
         buffer_time_ns: int = 100,
         opx_repetitions: int = 30,
-        make_program: bool = True
+        make_program: bool = True,
     ):
         print("DIVIDERS SHOULD NOT BE APPLIED TO VIRTUAL GATES ALREADY!!!")
         self.readout_time_ns = int(readout_time_us * 1e3)
@@ -112,13 +112,20 @@ class VirtualGateSetMeasurement:
         self.setup_slow_gateset(self.quam.VirtualGateSet1)
         self.setup_fast_gateset(self.quam.VirtualGateSet2)
 
-        
-        
-        self.update=False
-        self.virtual_gate_names = np.array(list(self.quam.VirtualGateSet1.virtual_gates.keys()))
-        self.gate_names = np.array([gate_name for gate_name in self.quam.gates if 'copy' not in gate_name])
-        self.virtual_matrix = np.array(list(self.quam.VirtualGateSet1.virtual_gates.values()))
-        assert (self.virtual_matrix == np.array(list(self.quam.VirtualGateSet2.virtual_gates.values()))).all(), 'all virtual gates must match'
+        self.update = False
+        self.virtual_gate_names = np.array(
+            list(self.quam.VirtualGateSet1.virtual_gates.keys())
+        )
+        self.gate_names = np.array(
+            [gate_name for gate_name in self.quam.gates if "copy" not in gate_name]
+        )
+        self.virtual_matrix = np.array(
+            list(self.quam.VirtualGateSet1.virtual_gates.values())
+        )
+        assert (
+            self.virtual_matrix
+            == np.array(list(self.quam.VirtualGateSet2.virtual_gates.values()))
+        ).all(), "all virtual gates must match"
 
         self.make_virtual_setters_and_getters()
 
@@ -128,17 +135,25 @@ class VirtualGateSetMeasurement:
             self.qm = self.qmm.open_qm(self.config)
             self.program_id = self.qm.compile(self.program)
 
-    def make_virtual_setters_and_getters(self,):
+    def make_virtual_setters_and_getters(
+        self,
+    ):
         self.virtual_setters = {}
         self.virtual_getters = {}
 
         for virt_index, virt in enumerate(self.virtual_gate_names):
             for gate_index, gate in enumerate(self.gate_names):
-                self.virtual_setters[f'{virt}_to_{gate}'] = partial(self.set_virt_element,virt_index=virt_index, gate_index=gate_index)
-                self.virtual_getters[f'{virt}_to_{gate}'] = partial(self.get_virt_element,virt_index=virt_index, gate_index=gate_index)
-    
+                self.virtual_setters[f"{virt}_to_{gate}"] = partial(
+                    self.set_virt_element, virt_index=virt_index, gate_index=gate_index
+                )
+                self.virtual_getters[f"{virt}_to_{gate}"] = partial(
+                    self.get_virt_element, virt_index=virt_index, gate_index=gate_index
+                )
+
     @property
-    def scan_range(self,):
+    def scan_range(
+        self,
+    ):
         return self._scan_range
 
     @scan_range.setter
@@ -148,16 +163,10 @@ class VirtualGateSetMeasurement:
 
     def set_virt_element(self, value, virt_index, gate_index):
         self.update = True
-        # row_index = np.where(v_gate==self.virtual_gate_names)
-        # column_index = np.where(v_gate==self.gate_names)
-
         self.virtual_matrix[virt_index, gate_index] = value
 
-    def get_virt_element(self, virt_index, gate):
-        # row_index = np.where(v_gate==self.virtual_gate_names)
-        # column_index = np.where(v_gate==self.gate_names)
+    def get_virt_element(self, virt_index, gate_index):
         return self.virtual_matrix[virt_index, gate_index]
-
 
     def setup_slow_gateset(self, virtual_gate_set):
         virtual_gate_set.operations["slow_pulse"] = VirtualPulse(
@@ -171,7 +180,9 @@ class VirtualGateSetMeasurement:
         virtual_gate_set.operations["big_pulse"] = VirtualPulse(
             length=int(self.readout_time_ns + self.buffer_time_ns),
             amplitudes={
-                list(virtual_gate_set.virtual_gates.keys())[1]: -self._sweep_range # minus important here
+                list(virtual_gate_set.virtual_gates.keys())[
+                    1
+                ]: -self._sweep_range  # minus important here
             },
         )
         virtual_gate_set.operations["small_pulse"] = VirtualPulse(
@@ -196,21 +207,22 @@ class VirtualGateSetMeasurement:
                     wait(1000)
                 pause()
 
-
             with stream_processing():
                 # I_stream.buffer(self.resolution, self.resolution).average().save('I')
                 # Q_stream.buffer(self.resolution, self.resolution).average().save('Q')
-                I_stream.buffer(self.opx_repetitions, self.resolution, self.resolution).map(
-                    FUNCTIONS.average(0)
-                ).save("I")
-                Q_stream.buffer(self.opx_repetitions, self.resolution, self.resolution).map(
-                    FUNCTIONS.average(0)
-                ).save("Q")
+                I_stream.buffer(
+                    self.opx_repetitions, self.resolution, self.resolution
+                ).map(FUNCTIONS.average(0)).save("I")
+                Q_stream.buffer(
+                    self.opx_repetitions, self.resolution, self.resolution
+                ).map(FUNCTIONS.average(0)).save("Q")
 
-                I_stream.buffer(self.opx_repetitions, self.resolution, self.resolution).map(
-                    FUNCTIONS.average(0)).save_all('I_full')
-                Q_stream.buffer(self.opx_repetitions, self.resolution, self.resolution).map(
-                    FUNCTIONS.average(0)).save_all('Q_full')
+                I_stream.buffer(
+                    self.opx_repetitions, self.resolution, self.resolution
+                ).map(FUNCTIONS.average(0)).save_all("I_full")
+                Q_stream.buffer(
+                    self.opx_repetitions, self.resolution, self.resolution
+                ).map(FUNCTIONS.average(0)).save_all("Q_full")
 
         return prog
 
@@ -256,27 +268,24 @@ class VirtualGateSetMeasurement:
             for gate in self.quam.gates:
                 ramp_to_zero(gate, duration=1)
 
-            
     def get_overrides_from_virtual_matrix(self, virtual_matrix):
         gate_vals_slow = virtual_matrix @ np.array([self._sweep_range, 0])
         gate_vals_fast = virtual_matrix @ np.array([0, self._sweep_range])
 
         overrides = {"waveforms": {}}
-        
+
         for i, gate in enumerate(self.quam.VirtualGateSet1.gates):
             overrides["waveforms"][f"{gate.id}.slow_pulse.wf"] = (
                 gate_vals_slow[i] * self.dividers[gate.id]
             )
 
-            
         for i, gate in enumerate(self.quam.VirtualGateSet2.gates):
             overrides["waveforms"][f"{gate.id}.big_pulse.wf"] = (
-               - gate_vals_fast[i] * self.dividers[gate.id]
+                -gate_vals_fast[i] * self.dividers[gate.id]
             )
             overrides["waveforms"][f"{gate.id}.small_pulse.wf"] = (
                 gate_vals_fast[i] * 2 / (self.resolution - 1) * self.dividers[gate.id]
             )
-
 
         return overrides
 
@@ -286,7 +295,9 @@ class VirtualGateSetMeasurement:
             self.job = self._add_compiled(overrides=overrides)
 
         else:
-            self.job = self._add_compiled(overrides = self.get_overrides_from_virtual_matrix(self.virtual_matrix))
+            self.job = self._add_compiled(
+                overrides=self.get_overrides_from_virtual_matrix(self.virtual_matrix)
+            )
 
         sleep(3)
         self.data_fetcher = fetching_tool(
@@ -311,9 +322,16 @@ class VirtualGateSetMeasurement:
         while not self.job.is_paused():
             sleep(0.01)
         I, Q = self.data_fetcher.fetch_all()
-        self.job.resume()
+        if self.update:
+            overrides = self.get_overrides_from_virtual_matrix(self.virtual_matrix)
+            self.start_acquisition(overrides=overrides)
+        else:
+            self.job.resume()
 
-        return I, Q #I.reshape(self.resolution, self.resolution), Q.reshape(self.resolution, self.resolution)
+        return (
+            I,
+            Q,
+        )  # I.reshape(self.resolution, self.resolution), Q.reshape(self.resolution, self.resolution)
 
     def _add_compiled(self, overrides=None):
         pending_job = self.qm.queue.add_compiled(self.program_id, overrides=overrides)
