@@ -86,12 +86,14 @@ class VirtualGateSetMeasurement:
         sweep_range: float = 0.05,
         buffer_time_ns: int = 100,
         opx_repetitions: int = 30,
+        make_program: bool = True
     ):
+        print("DIVIDERS SHOULD NOT BE APPLIED TO VIRTUAL GATES ALREADY!!!")
         self.readout_time_ns = int(readout_time_us * 1e3)
         self.readout_time_clk = int(self.readout_time_ns // 4)
         self.resolution = resolution
         self.quam = QuAM
-        self.sweep_range = sweep_range
+        self._sweep_range = sweep_range
         self.buffer_time_ns = int(buffer_time_ns)
         self.buffer_time_clk = int(buffer_time_ns // 4)
         self.opx_repetitions = opx_repetitions
@@ -110,16 +112,58 @@ class VirtualGateSetMeasurement:
         self.setup_slow_gateset(self.quam.VirtualGateSet1)
         self.setup_fast_gateset(self.quam.VirtualGateSet2)
 
-        self.config = self.quam.generate_config()
-        self.program = self.make_program()
-        self.qm = self.qmm.open_qm(self.config)
-        self.program_id = self.qm.compile(self.program)
+        
+        
+        self.update=False
+        self.virtual_gate_names = np.array(list(self.quam.VirtualGateSet1.virtual_gates.keys()))
+        self.gate_names = np.array([gate_name for gate_name in self.quam.gates if 'copy' not in gate_name])
+        self.virtual_matrix = np.array(list(self.quam.VirtualGateSet1.virtual_gates.values()))
+        assert (self.virtual_matrix == np.array(list(self.quam.VirtualGateSet2.virtual_gates.values()))).all(), 'all virtual gates must match'
+
+        self.make_virtual_setters_and_getters()
+
+        if make_program:
+            self.config = self.quam.generate_config()
+            self.program = self.make_program()
+            self.qm = self.qmm.open_qm(self.config)
+            self.program_id = self.qm.compile(self.program)
+
+    def make_virtual_setters_and_getters(self,):
+        self.virtual_setters = {}
+        self.virtual_getters = {}
+
+        for virt_index, virt in enumerate(self.virtual_gate_names):
+            for gate_index, gate in enumerate(self.gate_names):
+                self.virtual_setters[f'{virt}_to_{gate}'] = partial(self.set_virt_element,virt_index=virt_index, gate_index=gate_index)
+                self.virtual_getters[f'{virt}_to_{gate}'] = partial(self.get_virt_element,virt_index=virt_index, gate_index=gate_index)
+    
+    @property
+    def scan_range(self,):
+        return self._scan_range
+
+    @scan_range.setter
+    def scan_range(self, value):
+        self.update = True
+        self._scan_range = value
+
+    def set_virt_element(self, value, virt_index, gate_index):
+        self.update = True
+        # row_index = np.where(v_gate==self.virtual_gate_names)
+        # column_index = np.where(v_gate==self.gate_names)
+
+        self.virtual_matrix[virt_index, gate_index] = value
+
+    def get_virt_element(self, virt_index, gate):
+        # row_index = np.where(v_gate==self.virtual_gate_names)
+        # column_index = np.where(v_gate==self.gate_names)
+        return self.virtual_matrix[virt_index, gate_index]
+
 
     def setup_slow_gateset(self, virtual_gate_set):
         virtual_gate_set.operations["slow_pulse"] = VirtualPulse(
             length=int(self.readout_time_ns + self.buffer_time_ns),
             amplitudes={
-                list(virtual_gate_set.virtual_gates.keys())[0]: self.sweep_range
+                list(virtual_gate_set.virtual_gates.keys())[0]: self._sweep_range
             },
         )
 
@@ -127,13 +171,13 @@ class VirtualGateSetMeasurement:
         virtual_gate_set.operations["big_pulse"] = VirtualPulse(
             length=int(self.readout_time_ns + self.buffer_time_ns),
             amplitudes={
-                list(virtual_gate_set.virtual_gates.keys())[1]: -self.sweep_range
+                list(virtual_gate_set.virtual_gates.keys())[1]: -self._sweep_range # minus important here
             },
         )
         virtual_gate_set.operations["small_pulse"] = VirtualPulse(
             length=int(self.readout_time_ns + self.buffer_time_ns),
             amplitudes={
-                list(virtual_gate_set.virtual_gates.keys())[1]: (self.sweep_range * 2)
+                list(virtual_gate_set.virtual_gates.keys())[1]: (self._sweep_range * 2)
                 / (self.resolution - 1)
             },
         )
@@ -154,14 +198,14 @@ class VirtualGateSetMeasurement:
 
 
             with stream_processing():
-                I_stream.buffer(self.resolution, self.resolution).average().save('I')
-                Q_stream.buffer(self.resolution, self.resolution).average().save('Q')
-                # I_stream.buffer(self.opx_repetitions, self.resolution, self.resolution).map(
-                #     FUNCTIONS.average(0)
-                # ).save("I")
-                # Q_stream.buffer(self.opx_repetitions, self.resolution, self.resolution).map(
-                #     FUNCTIONS.average(0)
-                # ).save("Q")
+                # I_stream.buffer(self.resolution, self.resolution).average().save('I')
+                # Q_stream.buffer(self.resolution, self.resolution).average().save('Q')
+                I_stream.buffer(self.opx_repetitions, self.resolution, self.resolution).map(
+                    FUNCTIONS.average(0)
+                ).save("I")
+                Q_stream.buffer(self.opx_repetitions, self.resolution, self.resolution).map(
+                    FUNCTIONS.average(0)
+                ).save("Q")
 
                 I_stream.buffer(self.opx_repetitions, self.resolution, self.resolution).map(
                     FUNCTIONS.average(0)).save_all('I_full')
@@ -213,9 +257,9 @@ class VirtualGateSetMeasurement:
                 ramp_to_zero(gate, duration=1)
 
             
-    def get_overrides_from_virtualisation_matrix(self, virtualisation_matrix):
-        gate_vals_slow = virtualisation_matrix @ np.array([self.sweep_range, 0])
-        gate_vals_fast = virtualisation_matrix @ np.array([0, self.sweep_range])
+    def get_overrides_from_virtual_matrix(self, virtual_matrix):
+        gate_vals_slow = virtual_matrix @ np.array([self._sweep_range, 0])
+        gate_vals_fast = virtual_matrix @ np.array([0, self._sweep_range])
 
         overrides = {"waveforms": {}}
         
@@ -239,8 +283,10 @@ class VirtualGateSetMeasurement:
     def start_acquisition(self, overrides=None):
         if hasattr(self, "job"):
             self.job.halt()
+            self.job = self._add_compiled(overrides=overrides)
 
-        self.job = self._add_compiled(overrides=overrides)
+        else:
+            self.job = self._add_compiled(overrides = self.get_overrides_from_virtual_matrix(self.virtual_matrix))
 
         sleep(3)
         self.data_fetcher = fetching_tool(
