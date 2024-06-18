@@ -70,8 +70,7 @@ class QuAM(QuamRoot):
     VirtualGateSet2: VirtualGateSet = None
 
     def align_all(self):
-        align(*self.gates.values())
-        align(self.resonator)
+        align(self.resonator.name, *self.gates)
 
 
 class VirtualGateSetMeasurement:
@@ -93,9 +92,9 @@ class VirtualGateSetMeasurement:
         self.resolution = resolution
         self.quam = QuAM
         self.sweep_range = sweep_range
-        self.buffer_time_ns = buffer_time_ns
+        self.buffer_time_ns = int(buffer_time_ns)
         self.buffer_time_clk = int(buffer_time_ns // 4)
-        self.opx_repertitions = opx_repetitions
+        self.opx_repetitions = opx_repetitions
         self.dividers = dividers
         self.qmm = qmm
 
@@ -118,7 +117,7 @@ class VirtualGateSetMeasurement:
 
     def setup_slow_gateset(self, virtual_gate_set):
         virtual_gate_set.operations["slow_pulse"] = VirtualPulse(
-            length=int(self.readout_time_ns + 2 * self.buffer_time_ns),
+            length=int(self.readout_time_ns + self.buffer_time_ns),
             amplitudes={
                 list(virtual_gate_set.virtual_gates.keys())[0]: self.sweep_range
             },
@@ -126,13 +125,13 @@ class VirtualGateSetMeasurement:
 
     def setup_fast_gateset(self, virtual_gate_set):
         virtual_gate_set.operations["big_pulse"] = VirtualPulse(
-            length=int(self.readout_time_ns + 2 * self.buffer_time_ns),
+            length=int(self.readout_time_ns + self.buffer_time_ns),
             amplitudes={
-                list(virtual_gate_set.virtual_gates.keys())[1]: self.sweep_range
+                list(virtual_gate_set.virtual_gates.keys())[1]: -self.sweep_range
             },
         )
         virtual_gate_set.operations["small_pulse"] = VirtualPulse(
-            length=int(self.readout_time_ns + 2 * self.buffer_time_ns),
+            length=int(self.readout_time_ns + self.buffer_time_ns),
             amplitudes={
                 list(virtual_gate_set.virtual_gates.keys())[1]: (self.sweep_range * 2)
                 / (self.resolution - 1)
@@ -143,21 +142,31 @@ class VirtualGateSetMeasurement:
         self,
     ):
         with program() as prog:
-            # repetition_counter = declare(int)
+            repetition_counter = declare(int)
             I_stream = declare_stream()
             Q_stream = declare_stream()
 
             with infinite_loop_():
-                self.do_one_map(I_stream, Q_stream)
+                with for_(*from_array(repetition_counter, range(self.opx_repetitions))):
+                    self.do_one_map(I_stream, Q_stream)
+                    wait(1000)
+                pause()
+
 
             with stream_processing():
+                I_stream.buffer(self.resolution, self.resolution).average().save('I')
+                Q_stream.buffer(self.resolution, self.resolution).average().save('Q')
+                # I_stream.buffer(self.opx_repetitions, self.resolution, self.resolution).map(
+                #     FUNCTIONS.average(0)
+                # ).save("I")
+                # Q_stream.buffer(self.opx_repetitions, self.resolution, self.resolution).map(
+                #     FUNCTIONS.average(0)
+                # ).save("Q")
 
-                I_stream.buffer(self.opx_repertitions, self.resolution**2).map(
-                    FUNCTIONS.average(0)
-                ).save("I")
-                Q_stream.buffer(self.opx_repertitions, self.resolution**2).map(
-                    FUNCTIONS.average(0)
-                ).save("Q")
+                I_stream.buffer(self.opx_repetitions, self.resolution, self.resolution).map(
+                    FUNCTIONS.average(0)).save_all('I_full')
+                Q_stream.buffer(self.opx_repetitions, self.resolution, self.resolution).map(
+                    FUNCTIONS.average(0)).save_all('Q_full')
 
         return prog
 
@@ -167,13 +176,16 @@ class VirtualGateSetMeasurement:
         with for_(
             *from_array(amplitude_scale_slow, np.linspace(-1, 1, self.resolution))
         ):
+            # wait(100)
             self.quam.align_all()
             self.quam.VirtualGateSet1.play("slow_pulse", amplitude_scale_slow)
 
             self.quam.VirtualGateSet2.play(
                 "big_pulse",
             )
-            # this jumps all fast steps acquiring 1 row of the map
+            # wait(self.buffer_time_clk)
+            # i_var, q_var = self.quam.resonator.measure("readout")
+
             with for_(*from_array(small_jumps, range(self.resolution))):
                 self.quam.VirtualGateSet2.play(
                     "small_pulse",
@@ -190,29 +202,37 @@ class VirtualGateSetMeasurement:
 
             self.quam.VirtualGateSet1.play("slow_pulse", -1 * amplitude_scale_slow)
             self.quam.VirtualGateSet2.play("big_pulse", -1)
+            # wait(self.readout_time_clk + self.buffer_time_clk)
+
             with for_(*from_array(small_jumps, range(self.resolution))):
                 self.quam.VirtualGateSet2.play("small_pulse", amplitude_scale=-1)
-                wait(self.buffer_time_clk)
-                i_var, q_var = self.quam.resonator.measure("readout")
+                # wait(self.buffer_time_clk)
+                # i_var, q_var = self.quam.resonator.measure("readout")
 
             for gate in self.quam.gates:
                 ramp_to_zero(gate, duration=1)
 
+            
     def get_overrides_from_virtualisation_matrix(self, virtualisation_matrix):
         gate_vals_slow = virtualisation_matrix @ np.array([self.sweep_range, 0])
         gate_vals_fast = virtualisation_matrix @ np.array([0, self.sweep_range])
 
         overrides = {"waveforms": {}}
-        for i, gate in enumerate(self.quam.gates):
-            overrides["waveforms"][f"{gate}.slow_pulse.wf"] = (
-                gate_vals_slow[i] * self.dividers[gate]
+        
+        for i, gate in enumerate(self.quam.VirtualGateSet1.gates):
+            overrides["waveforms"][f"{gate.id}.slow_pulse.wf"] = (
+                gate_vals_slow[i] * self.dividers[gate.id]
             )
-            overrides["waveforms"][f"{gate}.big_pulse.wf"] = (
-                gate_vals_fast[i] * self.dividers[gate]
+
+            
+        for i, gate in enumerate(self.quam.VirtualGateSet2.gates):
+            overrides["waveforms"][f"{gate.id}.big_pulse.wf"] = (
+               - gate_vals_fast[i] * self.dividers[gate.id]
             )
-            overrides["waveforms"][f"{gate}.small_pulse.wf"] = (
-                gate_vals_fast[i] * 2 / (self.resolution - 1) * self.dividers[gate]
+            overrides["waveforms"][f"{gate.id}.small_pulse.wf"] = (
+                gate_vals_fast[i] * 2 / (self.resolution - 1) * self.dividers[gate.id]
             )
+
 
         return overrides
 
@@ -222,7 +242,7 @@ class VirtualGateSetMeasurement:
 
         self.job = self._add_compiled(overrides=overrides)
 
-        sleep(2)
+        sleep(3)
         self.data_fetcher = fetching_tool(
             self.job,
             data_list=[
@@ -242,14 +262,12 @@ class VirtualGateSetMeasurement:
                 'data fetcher not started, run "start_measurement" before trying to fetch results'
             )
 
-        # while not self.job.is_paused():
-        #     sleep(0.01)
+        while not self.job.is_paused():
+            sleep(0.01)
+        I, Q = self.data_fetcher.fetch_all()
+        self.job.resume()
 
-        I, Q = self.data_fetcher.fetch_all(flat_struct=True)
-        # self.job.resume()
-        # amplitude = I**2 + Q**2
-        # self.order = spiral_order(self.resolution)
-        return I.reshape(self.resolution, self.resolution)
+        return I, Q #I.reshape(self.resolution, self.resolution), Q.reshape(self.resolution, self.resolution)
 
     def _add_compiled(self, overrides=None):
         pending_job = self.qm.queue.add_compiled(self.program_id, overrides=overrides)
@@ -498,7 +516,7 @@ class OPX_live_controller:
             pass
 
         if self.wait_time >= 4:  # if logic to enable wait_time = 0 without error
-            wait(self.wait_time)
+            wait(self.wait_time, self.measured_element)
 
         measure(
             self.readout_pulse,
@@ -512,8 +530,8 @@ class OPX_live_controller:
         save(self._I, self._I_stream)
         save(self._Q, self._Q_stream)
 
-        if self.wait_time >= 4:  # if logic to enable wait_time = 0 without error
-            wait(self.wait_time)
+        # if self.wait_time >= 4:  # if logic to enable wait_time = 0 without error
+        #     wait(self.wait_time)
 
     def extra_steps_and_measurement(self, extra_step_input_stream):
         with if_(extra_step_input_stream):
@@ -629,6 +647,7 @@ class OPX_live_controller:
                     with while_(
                         completed_moves < self.resolution * (self.resolution - 1)
                     ):
+                        align(self.measured_element, *self.elements)
                         # for_ loop to move the required number of moves in the x direction
                         with for_(i, 0, i < moves_per_edge, i + 1):
                             self._step_gates(step_size_matrix[0, :], movement_direction)
