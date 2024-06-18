@@ -1,0 +1,206 @@
+#C:\Users\T7_3\miniconda3\envs\qcodes\Lib\site-packages\qcodes\instrument_drivers\QDev
+ instruments:   
+    keysight_A:
+        type: qcodes.instrument_drivers.Keysight.Keysight_34465A_submodules.Keysight_34465A
+        address: TCPIP0::10.209.67.44::inst0::INSTR
+        enable_forced_reconnect: true
+    
+    keysight_B:
+        type: qcodes.instrument_drivers.Keysight.Keysight_34465A_submodules.Keysight_34465A
+        address: TCPIP0::10.209.64.164::inst0::INSTR
+        enable_forced_reconnect: true
+
+    keysight_C:
+        type: qcodes.instrument_drivers.Keysight.Keysight_34465A_submodules.Keysight_34465A
+        address: TCPIP0::10.209.65.162::inst0::INSTR
+        enable_forced_reconnect: true    
+
+    keysight_RF:
+        type: qcodes.instrument_drivers.Keysight.Keysight_34465A_submodules.Keysight_34465A
+        address: TCPIP0::10.209.64.147::inst0::INSTR
+        enable_forced_reconnect: true   
+ 
+    keithley_A:
+        type: qcodes.instrument_drivers.tektronix.Keithley_2600_channels.Keithley_2600 
+        address: TCPIP0::10.209.66.177::inst0::INSTR
+        enable_forced_reconnect: true
+        parameters:
+            smua.volt:
+                step: 0.1
+                inter_delay: 0.05
+                limits: [-2,0.1]
+            smub.volt:
+                step: 0.005
+                inter_delay: 0.01
+                limits: [-1,1]
+    
+    magnet:
+        type: qcodes.instrument_drivers.oxford.MercuryiPS_VISA.OxfordMercuryiPS
+        address: TCPIP0::10.209.97.40::7020::SOCKET
+        enable_forced_reconnect: true
+        parameters:
+            z_measured: {monitor: true}
+            GRPZ.field_ramp_rate: {monitor: true}
+            y_measured: {monitor: true}
+            GRPY.field_ramp_rate: {monitor: true}
+            x_measured: {monitor: true}
+            GRPX.field_ramp_rate: {monitor: true}
+
+    AWG_1:
+        type: qcodes.instrument_drivers.tektronix.AWG5014.TektronixAWG5014
+        address: TCPIP0::10.209.66.170::INSTR
+        
+
+    Keysight_wave_gen_1:
+        type: qcodes.instrument_drivers.Keysight.Keysight33522B
+        address: TCPIP0::10.209.66.169::inst0::INSTR
+        parameters:
+            ch1.amplitude:
+                step: 0.001
+                inter_delay: 0.1
+
+    Lockin_SR860:
+        type: qcodes.instrument_drivers.stanford_research.SR860.SR860
+        address: USB0::0xB506::0x2000::003111::INSTR
+        parameters:
+            frequency: {monitor: true}
+            amplitude: {monitor: true}
+
+    Lockin_RF:
+        type: qcodes_contrib_drivers.drivers.StanfordResearchSystems.SR844.SR844
+        address: GPIB0::3::INSTR
+        parameters:
+            frequency: {monitor: true}
+            phase_offset: {monitor: true}
+
+    SG:
+        type: qcodes.instrument_drivers.stanford_research.SG384.SG384
+        address: TCPIP0::10.209.65.155::inst0::INSTR
+        parameters:
+            enable_RF: {intitial_value: 'OFF', monitor: true}
+            frequency: {monitor: true}
+
+    step_att_1:
+        type: qcodes.instrument_drivers.QDev.RCDAT_6000_60.RCDAT_6000_60
+        address: TCPIP0::10.209.64.167::23::SOCKET
+        enable_forced_reconnect: true
+        parameters:
+            attenuation: {initial_value: 36, monitor: true}
+
+    ZNB:
+        driver: qcodes.instrument_drivers.rohde_schwarz.ZNB
+        type: ZNB
+        address: TCPIP0::192.168.15.125::inst0::INSTR
+        init_s_params: false
+        enable_forced_reconnect: true
+        parameters:
+            S21.power:  {initial_value: -35, monitor: true}
+            S21.start:  {monitor: true}
+            S21.stop:  {monitor: true}
+            S21.avg:  {monitor: true}
+            S21.bandwidth:  {monitor: true}
+            S21.npts:  {monitor: true}
+            S21.status: {monitor: true} 
+
+    qdacII_A:
+        type: qcodes_contrib_drivers.drivers.QDevil.QDAC2.QDac2
+        address: ASRL9::INSTR #TCPIP0::10.209.67.14::5025::SOCKET # #
+        enable_forced_reconnect: true
+        add_parameters:
+            # ohmic_1: {source: ch01.dc_constant_V, label: ohmics_1 BNC16, unit: V, monitor: true, scale: 1, limits: [-0.2, 0.2], step: 0.001, inter_delay: 0.001}
+            # ohmic_3: {source: ch02.dc_constant_V, label: ohmics_3 BNC38, unit: V, monitor: true, scale: 1, limits: [-0.2, 0.2], step: 0.001, inter_delay: 0.001}
+            ohmic_1: {source: ch01.dc_constant_V, label: ohmics_1 BNC16, unit: V, monitor: true, scale: 1000, limits: [-0.01, 0.01], step: 0.00001, inter_delay: 0.0001}
+            ohmic_3: {source: ch02.dc_constant_V, label: ohmics_3 BNC38, unit: V, monitor: true, scale: 1000, limits: [-0.01, 0.01], step: 0.00001, inter_delay: 0.0001}
+            ohmic_5: {source: ch03.dc_constant_V, label: ohmics_5 BNC31, unit: V, monitor: true, scale: 1000, limits: [-0.01, 0.01], step: 0.00001, inter_delay: 0.0001}
+            BNC11: {source: ch04.dc_constant_V, label: top sensor right gate BNC11, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC10: {source: ch05.dc_constant_V, label: top sensor plunger gate BNC10, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC08: {source: ch06.dc_constant_V, label: top sensor left gate BNC08, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC47: {source: ch07.dc_constant_V, label: left sensor top gate BNC47, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC43: {source: ch08.dc_constant_V, label: left sensor plunger gate BNC43, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC42: {source: ch09.dc_constant_V, label: left sensor bottom gate BNC42, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC30: {source: ch10.dc_constant_V, label: right sensor bottom gate BNC30, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC29: {source: ch11.dc_constant_V, label: right sensor plunger gate BNC29, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC25: {source: ch12.dc_constant_V, label: right sensor top gate BNC25, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC06: {source: ch13.dc_constant_V, label: top dot gate left BNC06, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC20: {source: ch14.dc_constant_V, label: top dot gate right BNC20, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC07: {source: ch15.dc_constant_V, label: top dot plunger BNC07, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC05: {source: ch16.dc_constant_V, label: left barrier BNC05, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC48: {source: ch17.dc_constant_V, label: left dot gate left BNC48, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC37: {source: ch18.dc_constant_V, label: left dot gate bottom BNC37, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC36: {source: ch19.dc_constant_V, label: left dot plunger BNC36, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC34: {source: ch20.dc_constant_V, label: bottom barrier BNC34, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC32: {source: ch21.dc_constant_V, label: right dot gate bottom BNC32, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC21: {source: ch22.dc_constant_V, label: right dot gate right BNC21, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC12: {source: ch23.dc_constant_V, label: right dot plunger BNC12, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            BNC19: {source: ch24.dc_constant_V, label: right barrier BNC19, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+    # qdac_A:
+    #         type: qcodes.instrument_drivers.QDev.QDac_channels.QDac
+    #         address: ASRL3::INSTR
+    #         enable_forced_reconnect: true
+    #         init:
+    #             terminator: \n
+    #             update_currents: false
+    #         add_parameters:
+    #                 ohmic_1: {source: ch16.v, label: ohmics_1 BNC16, unit: V, monitor: true, scale: 1000, limits: [-0.01, 0.01], step: 0.00001, inter_delay: 0.0001}
+    #                 ohmic_2: {source: ch09.v, label: ohmics_2 BNC09, unit: V, monitor: true, scale: 1000, limits: [-0.01, 0.01], step: 0.00001, inter_delay: 0.0001}
+    #                 ohmic_3: {source: ch38.v, label: ohmics_3 BNC38, unit: V, monitor: true, scale: 1000, limits: [-0.01, 0.01], step: 0.00001, inter_delay: 0.0001}
+    #                 ohmic_4: {source: ch37.v, label: ohmics_4 BNC37, unit: V, monitor: true, scale: 1000, limits: [-0.01, 0.01], step: 0.00001, inter_delay: 0.0001}
+    #                 ohmic_5: {source: ch31.v, label: ohmics_5 BNC31, unit: V, monitor: true, scale: 1000, limits: [-0.01, 0.01], step: 0.00001, inter_delay: 0.0001}
+    #                 ohmic_6: {source: ch24.v, label: ohmics_6 BNC24, unit: V, monitor: true, scale: 1000, limits: [-0.01, 0.01], step: 0.00001, inter_delay: 0.0001}
+    #                 BNC15: {source: ch15.v, label: top sensor right gate BNC15, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC12: {source: ch12.v, label: top sensor plunger gate BNC12, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC10: {source: ch10.v, label: top sensor left gate BNC10, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}              
+    #                 BNC07: {source: ch07.v, label: left main gates lollipop BNC07, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC04: {source: ch04.v, label: left main gates top BNC04, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC05: {source: ch05.v, label: left main gates barrier BNC05, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC48: {source: ch48.v, label: left main gates bottom BNC48, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC45: {source: ch45.v, label: left sensor top gate BNC45, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC41: {source: ch41.v, label: left sensor plunger gate BNC41, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC39: {source: ch39.v, label: left sensor bottom gate BNC39, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC36: {source: ch36.v, label: bottom main gates lollipop BNC36, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC35: {source: ch35.v, label: bottom main gates left BNC35, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC34: {source: ch34.v, label: bottom main gates BNC34, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC32: {source: ch32.v, label: bottom main gates right BNC32, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC25: {source: ch25.v, label: right sensor top gate BNC25, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC29: {source: ch29.v, label: right sensor plunger gate BNC29, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC30: {source: ch30.v, label: right sensor bottom gate BNC30, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC46: {source: ch46.v, label: right main gates lollipop BNC46, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC23: {source: ch23.v, label: right main gates bottom BNC23, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC19: {source: ch19.v, label: right main gates barrier BNC19, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+    #                 BNC20: {source: ch20.v, label: right main gates top BNC20, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.001, inter_delay: 0.001}
+                    
+    # QDevil_QDac:
+    #     type: qcodes.instrument_drivers.QDevil.QDevil_QDAC.QDac
+    #     address: ASRL8::INSTR
+    #     enable_forced_reconnect: true
+    #     init:
+    #         terminator: \n
+    #         update_currents: false
+    #     add_parameters:
+    #             Ohmic_1: {source: ch01.v, label: Ohmics_1 BNC16, unit: V, monitor: true, scale: 1, limits: [-10, 10], step: 0.005, inter_delay: 0.001}
+    #             # Ohmic_2: {source: ch02.v, label: Ohmics_2 BNC11, unit: V, monitor: true, scale: 1, limits: [-1, 1], step: 0.005, inter_delay: 0.001}
+    #             # Ohmic_3: {source: ch02.v, label: Ohmics_3 BNC38, unit: V, monitor: true, scale: 1, limits: [-1, 1], step: 0.005, inter_delay: 0.001}
+    #             Ohmic_4: {source: ch02.v, label: Ohmics_4 BNC42, unit: V, monitor: true, scale: 1, limits: [-1, 1], step: 0.005, inter_delay: 0.001}
+    #             # Ohmic_5: {source: ch04.v, label: Ohmics_5 BNC31, unit: V, monitor: true, scale: 1, limits: [-1, 1], step: 0.005, inter_delay: 0.001}
+    #             Ohmic_6: {source: ch03.v, label: Ohmics_6 BNC24, unit: V, monitor: true, scale: 1, limits: [-1, 1], step: 0.005, inter_delay: 0.001}
+    #             BNC15: {source: ch04.v, label: top sensor right gate BNC15, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC12: {source: ch05.v, label: top sensor plunger gate BNC12, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC13: {source: ch06.v, label: top sensor left gate BNC13, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}              
+    #             BNC10: {source: ch07.v, label: left main gates lollipop BNC10, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC07: {source: ch08.v, label: left main gates top BNC07, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC05: {source: ch09.v, label: left main gates barrier BNC05, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC46: {source: ch10.v, label: left main gates bottom BNC46, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC47: {source: ch11.v, label: left sensor top gate BNC47, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC43: {source: ch12.v, label: left sensor plunger gate BNC43, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC44: {source: ch13.v, label: left sensor bottom gate BNC44, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC41: {source: ch14.v, label: bottom main gates lollipop BNC41, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC39: {source: ch15.v, label: bottom main gates left BNC39, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC36: {source: ch16.v, label: bottom main gates barrier BNC36, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC34: {source: ch17.v, label: bottom main gates right BNC34, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC25: {source: ch18.v, label: right sensor top gate BNC25, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC29: {source: ch19.v, label: right sensor plunger gate BNC29, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC30: {source: ch20.v, label: right sensor bottom gate BNC30, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC22: {source: ch21.v, label: right main gates lollipop BNC22, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC23: {source: ch22.v, label: right main gates bottom BNC23, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC19: {source: ch23.v, label: right main gates barrier BNC19, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}
+    #             BNC17: {source: ch24.v, label: right main gates top BNC17, unit: V, monitor: true, scale: 1, limits: [-2, 0.1], step: 0.005, inter_delay: 0.001}

@@ -120,11 +120,11 @@ class VirtualGateSetMeasurement:
             [gate_name for gate_name in self.quam.gates if "copy" not in gate_name]
         )
         self.virtual_matrix = np.array(
-            list(self.quam.VirtualGateSet1.virtual_gates.values())
-        )
+            list(self.quam.VirtualGateSet1.virtual_gates.values()), dtype=float
+        ).T
         assert (
             self.virtual_matrix
-            == np.array(list(self.quam.VirtualGateSet2.virtual_gates.values()))
+            == np.array(list(self.quam.VirtualGateSet2.virtual_gates.values())).T
         ).all(), "all virtual gates must match"
 
         self.make_virtual_setters_and_getters()
