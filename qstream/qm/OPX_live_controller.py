@@ -83,7 +83,7 @@ class VirtualGateSetMeasurement:
         readout_amplitude: float,
         dividers: Dict[str, float],
         integration_weights_angle: float = 0,
-        sweep_range: float = 0.05,
+        scan_range: float = 0.05,
         buffer_time_ns: int = 100,
         opx_repetitions: int = 30,
         make_program: bool = True,
@@ -93,7 +93,7 @@ class VirtualGateSetMeasurement:
         self.readout_time_clk = int(self.readout_time_ns // 4)
         self.resolution = resolution
         self.quam = QuAM
-        self._sweep_range = sweep_range
+        self._scan_range = scan_range
         self.buffer_time_ns = int(buffer_time_ns)
         self.buffer_time_clk = int(buffer_time_ns // 4)
         self.opx_repetitions = opx_repetitions
@@ -150,29 +150,27 @@ class VirtualGateSetMeasurement:
                     self.get_virt_element, virt_index=virt_index, gate_index=gate_index
                 )
 
-    @property
-    def scan_range(
+    def scan_range_getter(
         self,
     ):
         return self._scan_range
 
-    @scan_range.setter
-    def scan_range(self, value):
+    def scan_range_setter(self, value):
         self.update = True
         self._scan_range = value
 
     def set_virt_element(self, value, virt_index, gate_index):
         self.update = True
-        self.virtual_matrix[virt_index, gate_index] = value
+        self.virtual_matrix[gate_index, virt_index] = value
 
     def get_virt_element(self, virt_index, gate_index):
-        return self.virtual_matrix[virt_index, gate_index]
+        return self.virtual_matrix[gate_index, virt_index]
 
     def setup_slow_gateset(self, virtual_gate_set):
         virtual_gate_set.operations["slow_pulse"] = VirtualPulse(
             length=int(self.readout_time_ns + self.buffer_time_ns),
             amplitudes={
-                list(virtual_gate_set.virtual_gates.keys())[0]: self._sweep_range
+                list(virtual_gate_set.virtual_gates.keys())[0]: self._scan_range
             },
         )
 
@@ -182,13 +180,13 @@ class VirtualGateSetMeasurement:
             amplitudes={
                 list(virtual_gate_set.virtual_gates.keys())[
                     1
-                ]: -self._sweep_range  # minus important here
+                ]: -self._scan_range  # minus important here
             },
         )
         virtual_gate_set.operations["small_pulse"] = VirtualPulse(
             length=int(self.readout_time_ns + self.buffer_time_ns),
             amplitudes={
-                list(virtual_gate_set.virtual_gates.keys())[1]: (self._sweep_range * 2)
+                list(virtual_gate_set.virtual_gates.keys())[1]: (self._scan_range * 2)
                 / (self.resolution - 1)
             },
         )
@@ -269,8 +267,8 @@ class VirtualGateSetMeasurement:
                 ramp_to_zero(gate, duration=1)
 
     def get_overrides_from_virtual_matrix(self, virtual_matrix):
-        gate_vals_slow = virtual_matrix @ np.array([self._sweep_range, 0])
-        gate_vals_fast = virtual_matrix @ np.array([0, self._sweep_range])
+        gate_vals_slow = virtual_matrix @ np.array([self._scan_range, 0])
+        gate_vals_fast = virtual_matrix @ np.array([0, self._scan_range])
 
         overrides = {"waveforms": {}}
 
@@ -309,9 +307,7 @@ class VirtualGateSetMeasurement:
             mode="live",
         )
 
-    def fetch_results(
-        self,
-    ):
+    def fetch_results(self, live_plot=True):
         if hasattr(self, "data_fetcher"):
             pass
         else:
@@ -321,17 +317,23 @@ class VirtualGateSetMeasurement:
 
         while not self.job.is_paused():
             sleep(0.01)
+
         I, Q = self.data_fetcher.fetch_all()
+
         if self.update:
             overrides = self.get_overrides_from_virtual_matrix(self.virtual_matrix)
             self.start_acquisition(overrides=overrides)
+            self.update = False
         else:
             self.job.resume()
 
-        return (
-            I,
-            Q,
-        )  # I.reshape(self.resolution, self.resolution), Q.reshape(self.resolution, self.resolution)
+        if live_plot:
+            return I
+        else:
+            return (
+                I,
+                Q,
+            )  # I.reshape(self.resolution, self.resolution), Q.reshape(self.resolution, self.resolution)
 
     def _add_compiled(self, overrides=None):
         pending_job = self.qm.queue.add_compiled(self.program_id, overrides=overrides)

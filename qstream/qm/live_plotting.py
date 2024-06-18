@@ -27,8 +27,8 @@ class Live_plot_handler:
         virtual_range = qc.Parameter(
             name="virtual1_range",
             label="virtual1_range",
-            set_cmd=self.opx_controller.scan_range,
-            get_cmd=self.opx_controller.scan_range,
+            set_cmd=self.opx_controller.scan_range_setter,
+            get_cmd=self.opx_controller.scan_range_getter,
         )
 
         # virtual2_range = qc.Parameter(
@@ -39,7 +39,7 @@ class Live_plot_handler:
         # )
 
         self.controllers = {
-            "scan_range": (virtual_range, 0.1, self.opx_controller.scan_range()),
+            "scan_range": (virtual_range, 0.001, self.opx_controller.scan_range_getter()),
             # "v_gate2_range": (virtual2_range, 0.1, self.opx_controller.virtual_ranges[1]),
         }
         for virt_setter in self.opx_controller.virtual_setters.keys():
@@ -69,5 +69,5 @@ class Live_plot_handler:
             controllers=self.controllers,
             port=0,
             refresh_period=refresh_period,
-            extra_step=self.extra_step_func,
+            # extra_step=self.extra_step_func,
         )

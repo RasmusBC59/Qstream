@@ -95,7 +95,7 @@ class LiveStream:
         self.run_id_widget = TextInput(
             name="run_id", width=self.button_width, value=self.run_id_in_text
         )
-        self.run_id_widget.force_new_dynamic_value
+        # self.run_id_widget.force_new_dynamic_value
 
         self.colorbar_button = Button(
             name="Reset colorbar", button_type="primary", width=self.button_width
