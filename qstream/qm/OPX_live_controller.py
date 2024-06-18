@@ -33,7 +33,12 @@ from qm.qua import (
     ramp_to_zero,
 )
 from quam.core import QuamRoot, quam_dataclass
-from quam.components import SingleChannel, pulses, InOutSingleChannel
+from quam.components import (
+    SingleChannel,
+    pulses,
+    InOutSingleChannel,
+    StickyChannelAddon,
+)
 from quam.components.virtual_gate_set import VirtualGateSet, VirtualPulse
 from qualang_tools.loops import from_array
 from typing import Dict, Union
@@ -73,6 +78,81 @@ class QuAM(QuamRoot):
         align(self.resonator.name, *self.gates)
 
 
+def make_quam(
+    gates: Dict[str, int],
+    virtual_gates: Dict[str, list] = None,
+    resonator_input: int = 1,
+    resonator_output: int = 1,
+    resonator_freq: int = 176553106,
+    resonator_time_of_flight: int = 400,
+    controller: str = "con1",
+):
+    """make a QuAM object for live plotting
+
+    Args:
+        gates (Dict[str, int]): gate_name, opx_output
+        virtual_gates (Dict[str, list], optional): virtual_gate_name: list of virtualisation values (all gates required). Defaults to None.
+        resonator_input (int, optional): Defaults to 1.
+        resonator_output (int, optional): Defaults to 1.
+        resonator_freq (int, optional): Hz.  Defaults to 176553106.
+        resonator_time_of_flight (int, optional): ns. Defaults to 400.
+        controller (str, optional): which opx config controller to set. Defaults to "con1".
+    """
+
+    # print("DIVIDERS SHOULD NOT BE APPLIED TO VIRTUAL GATES ALREADY!!!")
+    machine = QuAM()
+    machine.gates = {}
+    for gate_name, opx_output in gates.items():
+        add_gate_and_copy(machine, gate_name, opx_output, controller=controller)
+
+    if virtual_gates is None:
+        virt_matrix = np.eye(2, len(gates))
+        virtual_gates = {
+            f"virtual_gate_{i+1}": virt_matrix[i, :].tolist() for i in range(2)
+        }
+
+    assert len(virtual_gates) == 2, "only 2 virtual gates are supported"
+    for virt_list in virtual_gates.values():
+        assert len(virt_list) == len(
+            gates
+        ), "all gates must have a virtualisation value"
+
+    machine.VirtualGateSet1 = VirtualGateSet(
+        gates=[f"#/gates/{gate}" for gate in gates],  # Be careful with ordering
+        virtual_gates=virtual_gates,
+        pulse_defaults=[pulses.SquarePulse(amplitude=None, length=None) for _ in gates],
+    )
+
+    machine.VirtualGateSet2 = VirtualGateSet(
+        gates=[f"#/gates/{gate}_copy" for gate in gates],  # Be careful with ordering
+        virtual_gates=virtual_gates,
+        pulse_defaults=[pulses.SquarePulse(amplitude=None, length=None) for _ in gates],
+    )
+
+    machine.resonator = InOutSingleChannel(
+        id="resonator",
+        opx_output=(controller, resonator_input),
+        opx_input=(controller, resonator_output),
+        intermediate_frequency=resonator_freq,
+        time_of_flight=resonator_time_of_flight,
+    )
+    return machine
+
+
+def add_gate_and_copy(machine, gate_name, opx_output, controller):
+    machine.gates[gate_name] = SingleChannel(
+        id=gate_name,
+        opx_output=(controller, opx_output),
+        sticky=StickyChannelAddon(duration=200, digital=False),
+    )
+    machine.gates[gate_name + "_copy"] = SingleChannel(
+        id=gate_name + "_copy",
+        opx_output=(controller, opx_output),
+        sticky=StickyChannelAddon(duration=200, digital=False),
+    )
+    return machine
+
+
 class VirtualGateSetMeasurement:
     def __init__(
         self,
@@ -85,7 +165,7 @@ class VirtualGateSetMeasurement:
         integration_weights_angle: float = 0,
         scan_range: float = 0.05,
         buffer_time_ns: int = 100,
-        opx_repetitions: int = 30,
+        opx_repetitions: int = 100,
         make_program: bool = True,
     ):
         print("DIVIDERS SHOULD NOT BE APPLIED TO VIRTUAL GATES ALREADY!!!")
@@ -230,21 +310,23 @@ class VirtualGateSetMeasurement:
         with for_(
             *from_array(amplitude_scale_slow, np.linspace(-1, 1, self.resolution))
         ):
-            # wait(100)
+
             self.quam.align_all()
             self.quam.VirtualGateSet1.play("slow_pulse", amplitude_scale_slow)
 
             self.quam.VirtualGateSet2.play(
                 "big_pulse",
             )
-            # wait(self.buffer_time_clk)
-            # i_var, q_var = self.quam.resonator.measure("readout")
+            wait(self.buffer_time_clk)
+            i_var, q_var = self.quam.resonator.measure("readout")
+            save(i_var, I_stream)
+            save(q_var, Q_stream)
 
-            with for_(*from_array(small_jumps, range(self.resolution))):
+            with for_(*from_array(small_jumps, range(self.resolution - 1))):
                 self.quam.VirtualGateSet2.play(
                     "small_pulse",
                 )
-                wait(self.buffer_time_clk)
+                wait(self.buffer_time_clk, self.quam.resonator.id)
                 i_var, q_var = self.quam.resonator.measure("readout")
                 save(i_var, I_stream)
                 save(q_var, Q_stream)
@@ -258,13 +340,16 @@ class VirtualGateSetMeasurement:
             self.quam.VirtualGateSet2.play("big_pulse", -1)
             # wait(self.readout_time_clk + self.buffer_time_clk)
 
-            with for_(*from_array(small_jumps, range(self.resolution))):
+            with for_(*from_array(small_jumps, range(self.resolution - 1))):
                 self.quam.VirtualGateSet2.play("small_pulse", amplitude_scale=-1)
                 # wait(self.buffer_time_clk)
                 # i_var, q_var = self.quam.resonator.measure("readout")
 
+            self.quam.align_all()
             for gate in self.quam.gates:
                 ramp_to_zero(gate, duration=1)
+
+            wait(100)
 
     def get_overrides_from_virtual_matrix(self, virtual_matrix):
         gate_vals_slow = virtual_matrix @ np.array([self._scan_range, 0])
