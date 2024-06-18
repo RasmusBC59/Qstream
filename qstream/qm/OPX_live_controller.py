@@ -425,6 +425,68 @@ class VirtualGateSetMeasurement:
         return pending_job.wait_for_execution()
 
 
+class VirtualGateSetMeasurementBetter(VirtualGateSetMeasurement):
+    def do_one_map(self, I_stream, Q_stream):
+        
+        amplitude_scale_slow = declare(fixed)
+        # small_jumps = declare(int)
+        with for_(
+            *from_array(amplitude_scale_slow, np.linspace(-1, 1, self.resolution)[:self.resolution//2])
+        ):
+
+            self.do_one_row(amplitude_scale_slow, I_stream, Q_stream)
+
+            # Do correction
+
+            self.do_one_row(-1 * amplitude_scale_slow, I_stream, Q_stream)
+            
+            wait(100)
+        
+        assign(amplitude_scale_slow, 0)
+        self.do_one_row(amplitude_scale_slow, I_stream, Q_stream)
+
+
+    def do_one_row(self, amplitude_scale, I_stream, Q_stream,):
+        small_jumps = declare(int)
+        self.quam.align_all()
+        self.quam.VirtualGateSet1.play("slow_pulse", amplitude_scale)
+
+        self.quam.VirtualGateSet2.play(
+            "big_pulse",
+        )
+        wait(self.buffer_time_clk)
+        i_var, q_var = self.quam.resonator.measure("readout")
+        save(i_var, I_stream)
+        save(q_var, Q_stream)
+
+        with for_(*from_array(small_jumps, range(self.resolution - 1))):
+            self.quam.VirtualGateSet2.play(
+                "small_pulse",
+            )
+            wait(self.buffer_time_clk, self.quam.resonator.id)
+            i_var, q_var = self.quam.resonator.measure("readout")
+            save(i_var, I_stream)
+            save(q_var, Q_stream)
+
+        for gate in self.quam.gates:
+            ramp_to_zero(gate, duration=1)
+
+    def fetch_results(self, live_plot=True):
+        returns = super().fetch_results(live_plot=live_plot)
+        if live_plot:
+            i = returns
+            return self.reorder_rows(i)
+        else:
+            i, q = returns
+            return self.reorder_rows(i), self.reorder_rows(q)
+
+    def reorder_rows(self, arr):
+        rows_even = arr[::2]
+        rows_odd = arr[1::2]
+
+        return np.concatenate([rows_even, rows_odd[::-1]])
+
+
 def spiral_order(N: int):
     # casting to int if necessary
     if not isinstance(N, int):
