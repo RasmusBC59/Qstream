@@ -10,7 +10,7 @@ from functools import partial
 
 
 class Live_plot_handler:
-    def __init__(self, opx_controller, resolution, extra_controllers=None):
+    def __init__(self, opx_controller, resolution, extra_controllers=None,):
         self.opx_controller = opx_controller
 
         # tmp_path = tempfile.gettempdir()
