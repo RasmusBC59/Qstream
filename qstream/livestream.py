@@ -54,6 +54,11 @@ class LiveStream:
 
         self.pipe = Pipe(data=[])
         self.data = zeros((self.video.y.n_points(), self.video.x.n_points()))
+        # Tsung-Lin ##################################
+        self.pipe_ch1 = Pipe(data=[])
+        self.data = zeros((self.video.y.n_points(), self.video.x.n_points()))
+
+        ##############################################
         # self.data = self.data_func.get()
         self.nr_average = 1.0
         self.button_width = 100
@@ -69,6 +74,13 @@ class LiveStream:
         self.image_dmap.opts(
             cmap="Magma", colorbar=True, width=800, height=700, toolbar="above"
         )
+        # Tsung-Lin ##################################
+        self.image_dmap_ch1 = hv.DynamicMap(hv.Image, streams=[self.pipe_ch1])
+        self.image_dmap_ch1.opts(
+            cmap="Viridis", colorbar=True, width=800, height=700, toolbar="above"
+        )
+
+        ##############################################
 
         self.plotsettings = PlotSettings()
         self.bound_plotsettings = bind(
@@ -80,6 +92,19 @@ class LiveStream:
             cmin=self.plotsettings.param.c_min,
             cmax=self.plotsettings.param.c_max,
         )
+        # Tsung-Lin ##################################
+
+        self.plotsettings_ch1 = PlotSettings()
+        self.bound_plotsettings = bind(
+            self.setplotsettings,
+            title=self.plotsettings.param.title,
+            xlabel=self.plotsettings.param.x_label,
+            ylabel=self.plotsettings.param.y_label,
+            clabel=self.plotsettings.param.c_label,
+            cmin=self.plotsettings.param.c_min,
+            cmax=self.plotsettings.param.c_max,
+        )
+        ##############################################
 
         # self.set_colobar_scale()
         self.set_labels()
@@ -154,6 +179,10 @@ class LiveStream:
             self.colorbar_button,
             self.close_button,
             self.time_pr_acquisition,
+            self.live_checkbox,
+            self.average,
+            self.set_average,
+            self.max_average_text,
         )
 
         controllersget = Column(*tuple(self.controle_value_widget))
@@ -166,23 +195,25 @@ class LiveStream:
 
         self.gridspec = GridSpec(width=1600, height=1200, sizing_mode="scale_height")
         self.gridspec[:, 0] = buttons
-        run_column = Column(
-            self.image_dmap,
-            self.live_checkbox,
-            self.average,
-            self.set_average,
-            self.max_average_text,
-        )
+        # run_column = Column(
+        #     self.image_dmap,
+        #     self.image_dmap_ch1, # Tsung-Lin
+        #     # self.live_checkbox,
+            # self.average,
+            # self.set_average,
+            # self.max_average_text,
+        # )
+        figure_column = Column(self.image_dmap,self.image_dmap_ch1)
         if self.start_stop:
-            run_column.append(self.start_stop.run_button)
+            buttons.append(self.start_stop.run_button)
 
         if self.extra_step:
             self.extra_step_widget = Start_stop_extra_step(
                 start_stop_extra_step=self.extra_step, reset_average=self.reset_average
             )
-            run_column.append(self.extra_step_widget.button)
+            buttons.append(self.extra_step_widget.button)
 
-        self.gridspec[:, 1:3] = run_column
+        self.gridspec[0, 1] = figure_column
         self.gridspec[:, 3] = controllersset + controllersget
         self.dis_tabs = [
             ("Video", self.gridspec),
@@ -207,6 +238,13 @@ class LiveStream:
             try:
                 start_time = perf_counter()
                 self.data = self.data_func.get()
+                # self.data will contain multiple resonators' signals. the shape will not be consistent (see above)
+                # when there are multiple resonators, this will be in ____ shape (waiting for the OPX side to decide)
+                # We can do:
+                # self.raw_data = self.data_func.get()
+                # self.data = _________
+                # self.data_ch1 = _________
+                # the data here will be re-group into different channels, se
                 self.nr_average_wiget.value = str(
                     self.data_func.root_instrument.nr_average.get()
                 )
@@ -217,7 +255,17 @@ class LiveStream:
                         self.data,
                     )
                 )
+                # Tsung-Lin ################################
+                self.pipe_ch1.send(
+                    (
+                        self.data_func.setpoints[1].get(), # so columns=x and rows=y
+                        self.data_func.setpoints[0].get(),
+                        self.data_ch1,
+                    )
+                )
+                #############################################
                 self.time_pr_acquisition.value = str(perf_counter() - start_time)
+
             except Exception as e:
                 print(e)
                 self.time_pr_acquisition.value = str(e)
