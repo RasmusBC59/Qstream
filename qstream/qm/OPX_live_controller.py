@@ -129,7 +129,7 @@ def make_quam(
         pulse_defaults=[pulses.SquarePulse(amplitude=None, length=None) for _ in gates],
     )
     if isinstance(resonator_freqs, int):
-        machine.resonators['resonator'] = InOutSingleChannel(
+        machine.resonators["resonator"] = InOutSingleChannel(
             id="resonator",
             opx_output=(controller, resonator_input),
             opx_input=(controller, resonator_output),
@@ -139,11 +139,11 @@ def make_quam(
     elif isinstance(resonator_freqs, dict):
         for resonator_name, frequency in resonator_freqs.items():
             machine.resonators[resonator_name] = InOutSingleChannel(
-            id=resonator_name,
-            opx_output=(controller, resonator_input),
-            opx_input=(controller, resonator_output),
-            intermediate_frequency=frequency,
-            time_of_flight=resonator_time_of_flight,
+                id=resonator_name,
+                opx_output=(controller, resonator_input),
+                opx_input=(controller, resonator_output),
+                intermediate_frequency=frequency,
+                time_of_flight=resonator_time_of_flight,
             )
     return machine
 
@@ -171,7 +171,7 @@ class VirtualGateSetMeasurement:
         readout_time_us: int,
         readout_amplitude: float,
         dividers: Dict[str, float],
-        integration_weights_angle: float = 0,
+        integration_weights_angle: float = 0,  # TODO add support for multiple resonators (maybe we should move this to QuAM object?)
         scan_range: float = 0.05,
         buffer_time_ns: int = 100,
         opx_repetitions: int = 100,
@@ -250,7 +250,7 @@ class VirtualGateSetMeasurement:
 
     def get_virt_element(self, virt_index, gate_index):
         return self.virtual_matrix[gate_index, virt_index]
-    
+
     def setup_resonators(self, readout_amplitude, integration_weights_angle):
         for resonator in self.quam.resonators.values():
             resonator.operations["readout"] = pulses.ConstantReadoutPulse(
@@ -258,7 +258,6 @@ class VirtualGateSetMeasurement:
                 amplitude=readout_amplitude,
                 integration_weights_angle=integration_weights_angle,
             )
-
 
     def setup_slow_gateset(self, virtual_gate_set):
         virtual_gate_set.operations["slow_pulse"] = VirtualPulse(
@@ -291,7 +290,10 @@ class VirtualGateSetMeasurement:
     ):
         with program() as prog:
             repetition_counter = declare(int)
-            streams = [(declare_stream(), declare_stream()) for resonator in self.quam.resonators]
+            streams = [
+                (declare_stream(), declare_stream())
+                for resonator in self.quam.resonators
+            ]
             # I_stream = declare_stream()
             # Q_stream = declare_stream()
 
@@ -374,7 +376,7 @@ class VirtualGateSetMeasurement:
         wait(self.buffer_time_clk, *self.quam.resonators)
         for I_streamQ_stream, resonator in zip(streams, self.quam.resonators.values()):
             I_stream, Q_stream = I_streamQ_stream
-            i_var, q_var = resonator.measure('readout')
+            i_var, q_var = resonator.measure("readout")
             save(i_var, I_stream)
             save(q_var, Q_stream)
 
@@ -412,7 +414,7 @@ class VirtualGateSetMeasurement:
         sleep(3)
         data_list = []
         for resonator in self.quam.resonators:
-            data_list.extend([f'I_{resonator}',f'Q_{resonator}'])
+            data_list.extend([f"I_{resonator}", f"Q_{resonator}"])
 
         self.data_fetcher = fetching_tool(
             self.job,
@@ -457,11 +459,14 @@ class VirtualGateSetMeasurement:
 
 class VirtualGateSetMeasurementBetter(VirtualGateSetMeasurement):
     def do_one_map(self, I_stream, Q_stream):
-        
+
         amplitude_scale_slow = declare(fixed)
         # small_jumps = declare(int)
         with for_(
-            *from_array(amplitude_scale_slow, np.linspace(-1, 1, self.resolution)[:self.resolution//2])
+            *from_array(
+                amplitude_scale_slow,
+                np.linspace(-1, 1, self.resolution)[: self.resolution // 2],
+            )
         ):
 
             self.do_one_row(amplitude_scale_slow, I_stream, Q_stream)
@@ -469,14 +474,18 @@ class VirtualGateSetMeasurementBetter(VirtualGateSetMeasurement):
             # Do correction
 
             self.do_one_row(-1 * amplitude_scale_slow, I_stream, Q_stream)
-            
+
             wait(100)
-        
+
         assign(amplitude_scale_slow, 0)
         self.do_one_row(amplitude_scale_slow, I_stream, Q_stream)
 
-
-    def do_one_row(self, amplitude_scale, I_stream, Q_stream,):
+    def do_one_row(
+        self,
+        amplitude_scale,
+        I_stream,
+        Q_stream,
+    ):
         small_jumps = declare(int)
         self.quam.align_all()
         self.quam.VirtualGateSet1.play("slow_pulse", amplitude_scale)
