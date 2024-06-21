@@ -179,10 +179,6 @@ class LiveStream:
             self.colorbar_button,
             self.close_button,
             self.time_pr_acquisition,
-            self.live_checkbox,
-            self.average,
-            self.set_average,
-            self.max_average_text,
         )
 
         controllersget = Column(*tuple(self.controle_value_widget))
@@ -195,15 +191,15 @@ class LiveStream:
 
         self.gridspec = GridSpec(width=1600, height=1200, sizing_mode="scale_height")
         self.gridspec[:, 0] = buttons
-        # run_column = Column(
-        #     self.image_dmap,
-        #     self.image_dmap_ch1, # Tsung-Lin
-        #     # self.live_checkbox,
-            # self.average,
-            # self.set_average,
-            # self.max_average_text,
-        # )
-        figure_column = Column(self.image_dmap,self.image_dmap_ch1)
+        run_column = Column(
+            self.image_dmap,
+            self.image_dmap_ch1, # 2nd live plot widget
+            self.live_checkbox,
+            self.average,
+            self.set_average,
+            self.max_average_text,
+        )
+        # figure_column = Column(self.image_dmap)#,self.image_dmap_ch1)
         if self.start_stop:
             buttons.append(self.start_stop.run_button)
 
@@ -213,7 +209,7 @@ class LiveStream:
             )
             buttons.append(self.extra_step_widget.button)
 
-        self.gridspec[0, 1] = figure_column
+        self.gridspec[0, 1:2] = run_column
         self.gridspec[:, 3] = controllersset + controllersget
         self.dis_tabs = [
             ("Video", self.gridspec),
@@ -238,29 +234,25 @@ class LiveStream:
             try:
                 start_time = perf_counter()
                 self.data = self.data_func.get()
-                # self.data will contain multiple resonators' signals. the shape will not be consistent (see above)
-                # when there are multiple resonators, this will be in ____ shape (waiting for the OPX side to decide)
-                # We can do:
-                # self.raw_data = self.data_func.get()
-                # self.data = _________
-                # self.data_ch1 = _________
-                # the data here will be re-group into different channels, se
+                # self.data containa multiple resonators' signals
+                # it's in the shape of (n_resonator, resolution, resolution), which corresponds to the setpoints [0,1,2]
+                # Note that the setpoints has been changes to setpoints[2] and setpoints[1]
                 self.nr_average_wiget.value = str(
                     self.data_func.root_instrument.nr_average.get()
                 )
                 self.pipe.send(
                     (
-                        self.data_func.setpoints[1].get(), # so columns=x and rows=y
-                        self.data_func.setpoints[0].get(),
-                        self.data,
+                        self.data_func.setpoints[2].get(), # so columns=x and rows=y
+                        self.data_func.setpoints[1].get(),
+                        self.data[0],
                     )
                 )
                 # Tsung-Lin ################################
                 self.pipe_ch1.send(
                     (
-                        self.data_func.setpoints[1].get(), # so columns=x and rows=y
-                        self.data_func.setpoints[0].get(),
-                        self.data_ch1,
+                        self.data_func.setpoints[2].get(), # so columns=x and rows=y
+                        self.data_func.setpoints[1].get(),
+                        self.data[1],
                     )
                 )
                 #############################################

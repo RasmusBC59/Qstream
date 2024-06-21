@@ -10,7 +10,7 @@ from functools import partial
 
 
 class Live_plot_handler:
-    def __init__(self, opx_controller, resolution, extra_controllers=None,):
+    def __init__(self, opx_controller, resolution, n_resonators, extra_controllers=None,):
         self.opx_controller = opx_controller
 
         # tmp_path = tempfile.gettempdir()
@@ -19,9 +19,10 @@ class Live_plot_handler:
         # exp = load_or_create_experiment("for_test", sample_name="no sample")
 
         self.video = VideoInstrument(
-            name="video",
+            name="video_inst",
             data_func=self.opx_controller.fetch_results,
             n_points=(resolution, resolution),
+            n_resonators = n_resonators
         )
 
         virtual_range = qc.Parameter(

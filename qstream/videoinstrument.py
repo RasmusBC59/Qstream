@@ -1,4 +1,5 @@
 from qcodes import Parameter
+from qcodes.parameters import ArrayParameter
 import numpy as np
 from qcodes.utils.validators import Numbers, Arrays
 from qcodes.instrument.base import Instrument
@@ -6,6 +7,8 @@ from qcodes.instrument.channel import InstrumentChannel
 from qcodes.instrument.parameter import ParameterWithSetpoints, Parameter
 from typing import Any, Iterable, Tuple, Union
 from qstream.timeout import timeout
+
+
 
 global time_open_threat
 time_open_threat = 3
@@ -110,24 +113,28 @@ class VideoRunnigAverage(ParameterWithSetpoints):
 
 
 class VideoInstrument(Instrument):
-    def __init__(self, name, data_func, n_points, **kwargs):
+    def __init__(self, name, data_func, n_points, n_resonators, **kwargs):
         super().__init__(name, **kwargs)
         self.data_func = data_func
         self.dis_tabs = None
 
-        # Add the channel to the instrument
+        # Add the x, y channel to the instrument
         for i, dim in enumerate(["y", "x"]):
             channel = VideoAxes(self, dim, dim, n_points[i])
             self.add_submodule(dim, channel)
 
+        # Tsung-Lin: followed the same way to create a new axis "z" which is the resonantor axis
+        resonator_channel = VideoAxes(self, "z", "z", n_resonators)
+        self.add_submodule( "z", resonator_channel)
+
         self.add_parameter(
             "video",
             unit="V",
-            setpoints=(self.y.V_axis, self.x.V_axis),
+            setpoints=(self.z.V_axis, self.y.V_axis, self.x.V_axis), # (resonator, resolution,resolution)
             label="Video",
             parameter_class=Video,
             data_func=self.data_func,
-            vals=Arrays(shape=(self.y.n_points.get_latest, self.x.n_points.get_latest)),
+            vals=Arrays(shape=(self.z.n_points.get_latest, self.y.n_points.get_latest, self.x.n_points.get_latest)), # (resonator, resolution,resolution)
         )
 
         self.add_parameter(
@@ -152,10 +159,10 @@ class VideoInstrument(Instrument):
         self.add_parameter(
             "videorunningaverage",
             unit="V",
-            setpoints=(self.y.V_axis, self.x.V_axis),
+            setpoints=(self.z.V_axis,self.y.V_axis, self.x.V_axis), # (resonator, resolution,resolution)
             label="VideoAverage",
             parameter_class=VideoRunnigAverage,
-            vals=Arrays(shape=(self.y.n_points.get_latest, self.x.n_points.get_latest)),
+            vals=Arrays(shape=(self.z.n_points.get_latest,self.y.n_points.get_latest, self.x.n_points.get_latest)), # (resonator, resolution,resolution)
         )
 
     def update_n_points(self, nry, nrx):
