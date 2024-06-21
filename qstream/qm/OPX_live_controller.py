@@ -48,6 +48,7 @@ from dataclasses import field
 import numpy as np
 from time import sleep
 from abc import ABC, abstractmethod
+from collections import defaultdict
 
 
 class LiveMeasurement(ABC):
@@ -171,13 +172,14 @@ class VirtualGateSetMeasurement:
         readout_time_us: int,
         readout_amplitude: float,
         dividers: Dict[str, float],
-        integration_weights_angle: float = 0,  # TODO add support for multiple resonators (maybe we should move this to QuAM object?)
+        integration_weights_angle: Dict[str, float] = None,
         scan_range: float = 0.05,
         buffer_time_ns: int = 100,
         opx_repetitions: int = 100,
         make_program: bool = True,
         save_all: bool = False,
     ):
+        # TODO: move everything related to creating the quam object to the QuAM class
         print("DIVIDERS SHOULD NOT BE APPLIED TO VIRTUAL GATES ALREADY!!!")
         self.readout_time_ns = int(readout_time_us * 1e3)
         self.readout_time_clk = int(self.readout_time_ns // 4)
@@ -252,11 +254,13 @@ class VirtualGateSetMeasurement:
         return self.virtual_matrix[gate_index, virt_index]
 
     def setup_resonators(self, readout_amplitude, integration_weights_angle):
+        if integration_weights_angle is None:
+            integration_weights_angle = defaultdict(lambda: 0)
         for resonator in self.quam.resonators.values():
             resonator.operations["readout"] = pulses.ConstantReadoutPulse(
                 length=self.readout_time_ns,
                 amplitude=readout_amplitude,
-                integration_weights_angle=integration_weights_angle,
+                integration_weights_angle=integration_weights_angle[resonator.id],
             )
 
     def setup_slow_gateset(self, virtual_gate_set):
@@ -445,7 +449,9 @@ class VirtualGateSetMeasurement:
             self.job.resume()
 
         if live_plot:
-            return np.array([I,I2]) # this has to be np.array class to pass the validator of the qcodes parameters in the instruement
+            return np.array(
+                [I, I2]
+            )  # this has to be np.array class to pass the validator of the qcodes parameters in the instruement
         else:
             return (
                 I,
