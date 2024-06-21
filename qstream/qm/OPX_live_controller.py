@@ -443,7 +443,7 @@ class VirtualGateSetMeasurement:
             self.job.resume()
 
         if live_plot:
-            return I
+            return np.array([I,I2]) # this has to be np.array class to pass the validator of the qcodes parameters in the instruement
         else:
             return (
                 I,
