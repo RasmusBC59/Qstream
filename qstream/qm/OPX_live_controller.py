@@ -176,10 +176,9 @@ class VirtualGateSetMeasurement:
         scan_range: float = 0.05,
         buffer_time_ns: int = 100,
         opx_repetitions: int = 100,
-        make_program: bool = True,
+        compile_program: bool = True,
         save_all: bool = False,
     ):
-        # TODO: move everything related to creating the quam object to the QuAM class
         print("DIVIDERS SHOULD NOT BE APPLIED TO VIRTUAL GATES ALREADY!!!")
         self.readout_time_ns = int(readout_time_us * 1e3)
         self.readout_time_clk = int(self.readout_time_ns // 4)
@@ -215,10 +214,9 @@ class VirtualGateSetMeasurement:
         ).all(), "all virtual gates must match"
 
         self.make_virtual_setters_and_getters()
-
-        if make_program:
-            self.config = self.quam.generate_config()
-            self.program = self.make_program(save_all=save_all)
+        self.config = self.quam.generate_config()
+        self.program = self.make_program(save_all=save_all)
+        if compile_program:
             self.qm = self.qmm.open_qm(self.config)
             self.program_id = self.qm.compile(self.program)
 
@@ -392,6 +390,7 @@ class VirtualGateSetMeasurement:
             save(i_var, I_stream)
             save(q_var, Q_stream)
 
+    # TODO: add support for multiple cuts
     def get_overrides_from_virtual_matrix(self, virtual_matrix):
         """
         get waveform overrides from virtual matrix for qua add_compiled
