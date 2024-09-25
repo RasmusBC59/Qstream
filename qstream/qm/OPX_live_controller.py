@@ -48,6 +48,7 @@ from dataclasses import field
 import numpy as np
 from time import sleep
 from abc import ABC, abstractmethod
+from collections import defaultdict
 
 
 class LiveMeasurement(ABC):
@@ -171,11 +172,11 @@ class VirtualGateSetMeasurement:
         readout_time_us: int,
         readout_amplitude: float,
         dividers: Dict[str, float],
-        integration_weights_angle: float = 0,  # TODO add support for multiple resonators (maybe we should move this to QuAM object?)
+        integration_weights_angle: Dict[str, float] = None,
         scan_range: float = 0.05,
         buffer_time_ns: int = 100,
         opx_repetitions: int = 100,
-        make_program: bool = True,
+        compile_program: bool = True,
         save_all: bool = False,
     ):
         print("DIVIDERS SHOULD NOT BE APPLIED TO VIRTUAL GATES ALREADY!!!")
@@ -213,13 +214,13 @@ class VirtualGateSetMeasurement:
         ).all(), "all virtual gates must match"
 
         self.make_virtual_setters_and_getters()
-
-        if make_program:
-            self.config = self.quam.generate_config()
-            self.program = self.make_program(save_all=save_all)
+        self.config = self.quam.generate_config()
+        self.program = self.make_program(save_all=save_all)
+        if compile_program:
             self.qm = self.qmm.open_qm(self.config)
             self.program_id = self.qm.compile(self.program)
 
+    # setters and getters are needed for qcodes integration
     def make_virtual_setters_and_getters(
         self,
     ):
@@ -251,14 +252,19 @@ class VirtualGateSetMeasurement:
     def get_virt_element(self, virt_index, gate_index):
         return self.virtual_matrix[gate_index, virt_index]
 
+    # sets up pulses in the config using quam
     def setup_resonators(self, readout_amplitude, integration_weights_angle):
+        if integration_weights_angle is None:
+            integration_weights_angle = defaultdict(lambda: 0)
         for resonator in self.quam.resonators.values():
             resonator.operations["readout"] = pulses.ConstantReadoutPulse(
                 length=self.readout_time_ns,
                 amplitude=readout_amplitude,
-                integration_weights_angle=integration_weights_angle,
+                integration_weights_angle=integration_weights_angle[resonator.id],
             )
 
+    # TODO: for different cuts in same live plot, add "prefix" argument here and generate multiple
+    # operations, 1 set for each cut
     def setup_slow_gateset(self, virtual_gate_set):
         virtual_gate_set.operations["slow_pulse"] = VirtualPulse(
             length=int(self.readout_time_ns + self.buffer_time_ns),
@@ -288,6 +294,14 @@ class VirtualGateSetMeasurement:
         self,
         save_all,
     ):
+        """makes program for live_plotting,
+
+        Args:
+            save_all (bool): whether to save all acquired data for the livestream (only used in testing)
+
+        Returns:
+            prog: qua program
+        """
         with program() as prog:
             repetition_counter = declare(int)
             streams = [
@@ -306,6 +320,8 @@ class VirtualGateSetMeasurement:
             with stream_processing():
                 for I_streamQ_stream, resonator in zip(streams, self.quam.resonators):
                     I_stream, Q_stream = I_streamQ_stream
+                    # I_stream.save(f'I_{resonator}')
+                    # Q_stream.save(f'Q_{resonator}')
                     I_stream.buffer(
                         self.opx_repetitions, self.resolution, self.resolution
                     ).map(FUNCTIONS.average(0)).save(f"I_{resonator}")
@@ -323,7 +339,13 @@ class VirtualGateSetMeasurement:
 
         return prog
 
+    # TODO: add "prefix" argument, to choose which cut is being run
     def do_one_map(self, streams):
+        """macro for doing one map
+
+        Args:
+            streams (list[quaStreams]): I/Q streams for each resonator
+        """
         amplitude_scale_slow = declare(fixed)
         small_jumps = declare(int)
         with for_(
@@ -337,20 +359,12 @@ class VirtualGateSetMeasurement:
                 "big_pulse",
             )
             self._measurement_macro(streams=streams)
-            # wait(self.buffer_time_clk)
-            # i_var, q_var = self.quam.resonator.measure("readout")
-            # save(i_var, I_stream)
-            # save(q_var, Q_stream)
 
             with for_(*from_array(small_jumps, range(self.resolution - 1))):
                 self.quam.VirtualGateSet2.play(
                     "small_pulse",
                 )
                 self._measurement_macro(streams=streams)
-                # wait(self.buffer_time_clk, self.quam.resonator.id)
-                # i_var, q_var = self.quam.resonator.measure("readout")
-                # save(i_var, I_stream)
-                # save(q_var, Q_stream)
 
             for gate in self.quam.gates:
                 ramp_to_zero(gate, duration=1)
@@ -359,12 +373,9 @@ class VirtualGateSetMeasurement:
 
             self.quam.VirtualGateSet1.play("slow_pulse", -1 * amplitude_scale_slow)
             self.quam.VirtualGateSet2.play("big_pulse", -1)
-            # wait(self.readout_time_clk + self.buffer_time_clk)
 
             with for_(*from_array(small_jumps, range(self.resolution - 1))):
                 self.quam.VirtualGateSet2.play("small_pulse", amplitude_scale=-1)
-                # wait(self.buffer_time_clk)
-                # i_var, q_var = self.quam.resonator.measure("readout")
 
             self.quam.align_all()
             for gate in self.quam.gates:
@@ -374,13 +385,24 @@ class VirtualGateSetMeasurement:
 
     def _measurement_macro(self, streams: List[tuple]):
         wait(self.buffer_time_clk, *self.quam.resonators)
+        # each resonator needs an I and Q stream
         for I_streamQ_stream, resonator in zip(streams, self.quam.resonators.values()):
             I_stream, Q_stream = I_streamQ_stream
             i_var, q_var = resonator.measure("readout")
             save(i_var, I_stream)
             save(q_var, Q_stream)
 
+    # TODO: add support for multiple cuts
     def get_overrides_from_virtual_matrix(self, virtual_matrix):
+        """
+        get waveform overrides from virtual matrix for qua add_compiled
+        also applies dividers
+        Args:
+            virtual_matrix (np.ndarray)
+
+        Returns:
+            dict: overrides for add_compiled
+        """
         gate_vals_slow = virtual_matrix @ np.array([self._scan_range, 0])
         gate_vals_fast = virtual_matrix @ np.array([0, self._scan_range])
 
@@ -402,6 +424,12 @@ class VirtualGateSetMeasurement:
         return overrides
 
     def start_acquisition(self, overrides=None):
+        """starts qua program and data fetching
+        this function is both used at the start of live plotting and every time
+        something in the program needs to be updated
+        Args:
+            overrides (dict, optional): overrides for add_compiled. Defaults to None.
+        """
         if hasattr(self, "job"):
             self.job.halt()
             self.job = self._add_compiled(overrides=overrides)
@@ -414,7 +442,7 @@ class VirtualGateSetMeasurement:
         sleep(3)
         data_list = []
         for resonator in self.quam.resonators:
-            data_list.extend([f"I_{resonator}", f"Q_{resonator}"])
+            data_list.extend([f"I_{resonator}"])
 
         self.data_fetcher = fetching_tool(
             self.job,
@@ -429,14 +457,18 @@ class VirtualGateSetMeasurement:
             raise Exception(
                 'data fetcher not started, run "start_measurement" before trying to fetch results'
             )
-
+        # from time import perf_counter
+        # start = perf_counter()
         while not self.job.is_paused():
             sleep(0.01)
-
+        # print('sleep time: ',perf_counter()-start)
+        # sleep(1)
+        # start = perf_counter()
         all_data = self.data_fetcher.fetch_all()
-        I = all_data[0]
-        Q = all_data[1]
-        I2 = all_data[2]
+        # print('fetch time: ',perf_counter()-start)
+        I = all_data[0]  # TODO: this should be made more general
+        I2 = all_data[1]
+        # I2 = all_data[3] #this is Q for the second sensor
         if self.update:
             overrides = self.get_overrides_from_virtual_matrix(self.virtual_matrix)
             self.start_acquisition(overrides=overrides)
@@ -445,11 +477,13 @@ class VirtualGateSetMeasurement:
             self.job.resume()
 
         if live_plot:
-            return np.array([I,I2]) # this has to be np.array class to pass the validator of the qcodes parameters in the instruement
+            return np.array(
+                [I, I2]
+            )  # this has to be np.array class to pass the validator of the qcodes parameters in the instruement
         else:
             return (
                 I,
-                Q,
+                I2,
             )  # I.reshape(self.resolution, self.resolution), Q.reshape(self.resolution, self.resolution)
 
     def _add_compiled(self, overrides=None):

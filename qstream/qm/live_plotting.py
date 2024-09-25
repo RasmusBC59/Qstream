@@ -40,7 +40,7 @@ class Live_plot_handler:
         # )
 
         self.controllers = {
-            "scan_range": (virtual_range, 0.001, self.opx_controller.scan_range_getter()),
+            "scan_range": (virtual_range, 0.01, self.opx_controller.scan_range_getter()),
             # "v_gate2_range": (virtual2_range, 0.1, self.opx_controller.virtual_ranges[1]),
         }
         for virt_setter in self.opx_controller.virtual_setters.keys():
