@@ -308,8 +308,6 @@ class VirtualGateSetMeasurement:
                 (declare_stream(), declare_stream())
                 for resonator in self.quam.resonators
             ]
-            # I_stream = declare_stream()
-            # Q_stream = declare_stream()
 
             with infinite_loop_():
                 with for_(*from_array(repetition_counter, range(self.opx_repetitions))):
@@ -318,8 +316,7 @@ class VirtualGateSetMeasurement:
                 pause()
 
             with stream_processing():
-                for I_streamQ_stream, resonator in zip(streams, self.quam.resonators):
-                    I_stream, Q_stream = I_streamQ_stream
+                for I_stream, Q_stream, resonator in zip(*streams, self.quam.resonators):
                     # I_stream.save(f'I_{resonator}')
                     # Q_stream.save(f'Q_{resonator}')
                     I_stream.buffer(
@@ -332,14 +329,13 @@ class VirtualGateSetMeasurement:
                     if save_all:
                         I_stream.buffer(
                             self.opx_repetitions, self.resolution, self.resolution
-                        ).map(FUNCTIONS.average(0)).save_all("I_full")
+                        ).map(FUNCTIONS.average(0)).save_all(f"I_{resonator}_full")
                         Q_stream.buffer(
                             self.opx_repetitions, self.resolution, self.resolution
-                        ).map(FUNCTIONS.average(0)).save_all("Q_full")
+                        ).map(FUNCTIONS.average(0)).save_all(f"Q_{resonator}_full")
 
         return prog
 
-    # TODO: add "prefix" argument, to choose which cut is being run
     def do_one_map(self, streams):
         """macro for doing one map
 
@@ -439,7 +435,7 @@ class VirtualGateSetMeasurement:
                 overrides=self.get_overrides_from_virtual_matrix(self.virtual_matrix)
             )
 
-        sleep(3)
+        sleep(2)
         data_list = []
         for resonator in self.quam.resonators:
             data_list.extend([f"I_{resonator}"])
@@ -450,20 +446,16 @@ class VirtualGateSetMeasurement:
             mode="live",
         )
 
-    def fetch_results(self, live_plot=True):
+    def fetch_results(self,):
         if hasattr(self, "data_fetcher"):
             pass
         else:
             raise Exception(
                 'data fetcher not started, run "start_measurement" before trying to fetch results'
             )
-        # from time import perf_counter
-        # start = perf_counter()
+        
         while not self.job.is_paused():
             sleep(0.01)
-        # print('sleep time: ',perf_counter()-start)
-        # sleep(1)
-        # start = perf_counter()
         all_data = self.data_fetcher.fetch_all()
         # print('fetch time: ',perf_counter()-start)
         I = all_data[0]  # TODO: this should be made more general
@@ -476,15 +468,9 @@ class VirtualGateSetMeasurement:
         else:
             self.job.resume()
 
-        if live_plot:
-            return np.array(
-                [I, I2]
-            )  # this has to be np.array class to pass the validator of the qcodes parameters in the instruement
-        else:
-            return (
-                I,
-                I2,
-            )  # I.reshape(self.resolution, self.resolution), Q.reshape(self.resolution, self.resolution)
+        return np.array(
+            [I, I2]
+        )  # this has to be np.array class to pass the validator of the qcodes parameters in the instruement
 
     def _add_compiled(self, overrides=None):
         pending_job = self.qm.queue.add_compiled(self.program_id, overrides=overrides)
