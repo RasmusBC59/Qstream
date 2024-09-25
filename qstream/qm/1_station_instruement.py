@@ -4,11 +4,11 @@ STATION = qc.Station(config_file='Config_T7_acq_1_20231011.yaml', use_monitor=Tr
 
 qdac = STATION.load_instrument('qdacII_A')
 
-dmm = STATION.load_instrument('keysight_A')
+# dmm = STATION.load_instrument('keysight_A')
 
-dmm_2 = STATION.load_instrument('keysight_B')
+# dmm_2 = STATION.load_instrument('keysight_B')
 
-dmm_3 = STATION.load_instrument('keysight_C')
+# dmm_3 = STATION.load_instrument('keysight_C')
 
 # dmm_RF = STATION.load_instrument('keysight_RF')
 

@@ -65,7 +65,8 @@ class Live_plot_handler:
 
     def start_stream(self, refresh_period=3000):
         self.opx_controller.start_acquisition()
-        live = LiveStream(
+        # make it self, so I can stop the callback
+        self.live = LiveStream(
             video=self.video,
             controllers=self.controllers,
             port=0,

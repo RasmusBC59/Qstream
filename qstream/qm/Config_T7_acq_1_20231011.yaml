@@ -85,7 +85,7 @@
         address: TCPIP0::10.209.64.167::23::SOCKET
         enable_forced_reconnect: true
         parameters:
-            attenuation: {initial_value: 36, monitor: true}
+            attenuation: {initial_value: 42, monitor: true}
 
     ZNB:
         driver: qcodes.instrument_drivers.rohde_schwarz.ZNB
@@ -109,9 +109,9 @@
         add_parameters:
             # ohmic_1: {source: ch01.dc_constant_V, label: ohmics_1 BNC16, unit: V, monitor: true, scale: 1, limits: [-0.2, 0.2], step: 0.001, inter_delay: 0.001}
             # ohmic_3: {source: ch02.dc_constant_V, label: ohmics_3 BNC38, unit: V, monitor: true, scale: 1, limits: [-0.2, 0.2], step: 0.001, inter_delay: 0.001}
-            ohmic_1: {source: ch01.dc_constant_V, label: ohmics_1 BNC16, unit: V, monitor: true, scale: 1000, limits: [-0.01, 0.01], step: 0.00001, inter_delay: 0.0001}
-            ohmic_3: {source: ch02.dc_constant_V, label: ohmics_3 BNC38, unit: V, monitor: true, scale: 1000, limits: [-0.01, 0.01], step: 0.00001, inter_delay: 0.0001}
-            ohmic_5: {source: ch03.dc_constant_V, label: ohmics_5 BNC31, unit: V, monitor: true, scale: 1000, limits: [-0.01, 0.01], step: 0.00001, inter_delay: 0.0001}
+            # ohmic_1: {source: ch01.dc_constant_V, label: ohmics_1 BNC16, unit: V, monitor: true, scale: 1000, limits: [-0.01, 0.01], step: 0.00001, inter_delay: 0.0001}
+            # ohmic_3: {source: ch02.dc_constant_V, label: ohmics_3 BNC38, unit: V, monitor: true, scale: 1000, limits: [-0.01, 0.01], step: 0.00001, inter_delay: 0.0001}
+            # ohmic_5: {source: ch03.dc_constant_V, label: ohmics_5 BNC31, unit: V, monitor: true, scale: 1000, limits: [-0.01, 0.01], step: 0.00001, inter_delay: 0.0001}
             BNC11: {source: ch04.dc_constant_V, label: top sensor right gate BNC11, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
             BNC10: {source: ch05.dc_constant_V, label: top sensor plunger gate BNC10, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
             BNC08: {source: ch06.dc_constant_V, label: top sensor left gate BNC08, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
@@ -133,6 +133,10 @@
             BNC21: {source: ch22.dc_constant_V, label: right dot gate right BNC21, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
             BNC12: {source: ch23.dc_constant_V, label: right dot plunger BNC12, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
             BNC19: {source: ch24.dc_constant_V, label: right barrier BNC19, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+
+            test_01: {source: ch01.dc_constant_V, label: ch01, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            test_02: {source: ch02.dc_constant_V, label: ch02, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
+            test_03: {source: ch03.dc_constant_V, label: ch03, unit: V, monitor: true, scale: 1, limits: [-1, 0.1], step: 0.001, inter_delay: 0.001}
     # qdac_A:
     #         type: qcodes.instrument_drivers.QDev.QDac_channels.QDac
     #         address: ASRL3::INSTR

@@ -48,6 +48,7 @@ class LiveStream:
     ):
         self.video = video
         self.controllers = controllers
+        self.controller_object_dict = {}
         self.port = port
         self.refresh_period = refresh_period
         self.data_func = video.videorunningaverage
@@ -273,6 +274,8 @@ class LiveStream:
 
     def close_server_click(self, event):
         self.video_mode_server.stop()
+        self.video_mode_callback.stop()
+
 
     def set_labels(self):
         self.plotsettings.x_label = (
@@ -297,10 +300,17 @@ class LiveStream:
         self.colorbar_button.loading = False
 
     def set_colobar_scale(self):
-        cmin = self.data.min()
-        cmax = self.data.max()
+        cmin = self.data[0].min()
+        cmax = self.data[0].max()
         self.plotsettings.c_min = cmin
         self.plotsettings.c_max = cmax
+
+        # 2nd data
+        cmin = self.data[1].min()
+        cmax = self.data[1].max()
+        self.plotsettings_ch1.c_min = cmin
+        self.plotsettings_ch1.c_max = cmax
+
 
     def setplotsettings(self, title, xlabel, ylabel, clabel, cmin, cmax):
         return self.image_dmap.opts(
@@ -308,14 +318,25 @@ class LiveStream:
         )
 
     def add_controle_wiget(self, name, controller, controllertype, axis=None):
+        '''
+        arg:
+        name = controller.key
+        controller = controller
+                    (controller[0] = qcodes.parameter,
+                     controller[1] = step size,
+                     controller[2] = value readout)
+        controllertype = ControleWidget class
+        '''
         control_create = controllertype(
             displayname=name,
-            qchan=controller[0],
+            qchan=controller[0], 
             step=controller[1],
             value=controller[2],
             reset_average=self.reset_average,
             axis=axis,
         )
+
+        self.controller_object_dict[name] = control_create
 
         self.control_widgets.append(
             [
@@ -348,6 +369,22 @@ class LiveStream:
 
     def callback(self, target, event):
         target.opts(clim=(event.new, event.new + 1))
+
+    
+    # define some new functions for controller class properties readout
+    '''
+    These functions use some more new parameters from the ControlWidget class,
+    which help user defined qcodes parameters to get the step size and change other gates values
+    '''
+    def controller_value(self, controller_name):
+        return self.controller_object_dict[controller_name].controle_value
+
+    def controller_value_step(self, controller_name):
+        return self.controller_object_dict[controller_name].controle_step
+
+    def virtual_controller_change(self, controller_name, step):
+        self.controller_object_dict[controller_name].virtual_controle_change(step)
+    
 
 
 class ControleWidget:
@@ -396,11 +433,31 @@ class ControleWidget:
         self.controle_change(-self.step / 10, event)
 
     def controle_change(self, step, event):
+        '''
+        1. get the old value from self.controle_display.value and save it as self.controle_value
+        2. add a step to controle_value depending on the small or large change . save step to self.controle_step
+        3. display the new value through self.controle_display.value based on the 3.new value
+        '''
         self.controle_value = float(self.controle_display.value)
         self.controle_value = self.controle_value + step
-        self.controle_display.value = str(self.controle_value)
+        self.controle_step = step
         self.qchan.set(self.controle_value)
+        self.controle_display.value = str(self.controle_value)
         self.rest_average(event)
+
+    def virtual_controle_change(self, step):
+        '''
+        This function is to change other gates values throught the control widget.
+        The usual command like qdac.BNC36() is not working properly.
+        The reason is because the livestream class is running in the background all the time,
+        which keeps querying QDACII.
+        The current solution is always to use the control widget
+        '''
+        self.controle_value = float(self.controle_display.value)
+        self.controle_value = self.controle_value + step
+        self.controle_step = step
+        self.qchan.set(self.controle_value)
+        self.controle_display.value = str(self.controle_value)
 
 
 class dcWidget(ControleWidget):
