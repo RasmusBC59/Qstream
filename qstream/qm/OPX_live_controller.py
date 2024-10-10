@@ -80,13 +80,13 @@ class QuAM(QuamRoot):
 
 
 def make_quam(
-    gates: Dict[str, int],
+    gates: Dict[str, tuple[str, int]],
     virtual_gates: Dict[str, list] = None,
-    resonator_input: int = 1,
-    resonator_output: int = 1,
+    resonator_input: tuple[str, int] = ("con1", 1),
+    resonator_output: tuple[str, int] = ("con1", 1),
     resonator_freqs: Union[Dict[str, int], int] = 176553106,
     resonator_time_of_flight: int = 400,
-    controller: str = "con1",
+    # controller: str = "con1",
 ):
     """make a QuAM object for live plotting
 
@@ -103,7 +103,8 @@ def make_quam(
     # print("DIVIDERS SHOULD NOT BE APPLIED TO VIRTUAL GATES ALREADY!!!")
     machine = QuAM()
     machine.gates = {}
-    for gate_name, opx_output in gates.items():
+    for gate_name, output in gates.items():
+        controller, opx_output = output
         add_gate_and_copy(machine, gate_name, opx_output, controller=controller)
 
     if virtual_gates is None:
@@ -132,8 +133,8 @@ def make_quam(
     if isinstance(resonator_freqs, int):
         machine.resonators["resonator"] = InOutSingleChannel(
             id="resonator",
-            opx_output=(controller, resonator_input),
-            opx_input=(controller, resonator_output),
+            opx_output=(resonator_input[0], resonator_input[1]),
+            opx_input=(resonator_output[0], resonator_output[1]),
             intermediate_frequency=resonator_freqs,
             time_of_flight=resonator_time_of_flight,
         )
@@ -141,8 +142,8 @@ def make_quam(
         for resonator_name, frequency in resonator_freqs.items():
             machine.resonators[resonator_name] = InOutSingleChannel(
                 id=resonator_name,
-                opx_output=(controller, resonator_input),
-                opx_input=(controller, resonator_output),
+                opx_output=(resonator_input[0], resonator_input[1]),
+                opx_input=(resonator_output[0], resonator_output[1]),
                 intermediate_frequency=frequency,
                 time_of_flight=resonator_time_of_flight,
             )
