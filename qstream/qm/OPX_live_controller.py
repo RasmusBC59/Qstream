@@ -189,7 +189,12 @@ class VirtualGateSetMeasurement:
         self.buffer_time_ns = int(buffer_time_ns)
         self.buffer_time_clk = int(buffer_time_ns // 4)
         self.opx_repetitions = opx_repetitions
-        self.dividers = dividers
+        self.dividers = {}
+        for key in dividers:
+            self.dividers[key] = dividers[key]
+            self.dividers[key + "_copy"] = dividers[key]
+
+
         self.qmm = qmm
 
         for gate in self.quam.gates.values():
